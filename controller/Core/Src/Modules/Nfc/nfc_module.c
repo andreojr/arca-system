@@ -1,0 +1,1 @@
+../../../../../shared/Core/Src/Modules/Nfc/nfc_module.c

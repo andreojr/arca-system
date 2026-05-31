@@ -1,0 +1,1 @@
+../../../../../shared/Core/Inc/Modules/Nfc/pn532_stm32f4.h

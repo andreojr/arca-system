@@ -1,0 +1,1 @@
+../../../../../shared/Core/Inc/Modules/Communication/cc1101.h
