@@ -30,6 +30,24 @@ void DOOR_OnCardRead(const uint8_t *uid, uint8_t uid_len)
     COM_Module_Send(ADDR_CONTROLLER, EVENT_AUTHORIZE, s_uid, s_uid_len);
 }
 
+void DOOR_OnStatusRequest(void)
+{
+    printf("[DOOR] STATUS_REQUEST recebido\r\n");
+
+    /* TODO: substituir por leitura real do DHT11 */
+    uint8_t payload[4];
+    uint8_t temp     = 25;  /* 25°C */
+    uint8_t humidity = 60;  /* 60%RH */
+
+    payload[0] = temp;
+    payload[1] = 0x00;      /* decimal — sempre 0 no DHT11 */
+    payload[2] = humidity;
+    payload[3] = 0x00;      /* decimal — sempre 0 no DHT11 */
+
+    COM_Module_Send(ADDR_CONTROLLER, EVENT_STATUS_RESPONSE, payload, 4);
+    printf("[DOOR] STATUS_RESPONSE enviado\r\n");
+}
+
 void DOOR_OnEvent(uint8_t event, const uint8_t *payload, uint8_t payload_len)
 {
     if (s_state != DOOR_VALIDATING) return;

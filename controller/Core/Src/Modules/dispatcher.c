@@ -7,7 +7,11 @@ static void _on_rx(uint8_t event, uint8_t src, const uint8_t *payload, uint8_t p
 {
     switch (event) {
         case EVENT_AUTHORIZE:
-            HUB_OnEvent(event, src, payload, payload_len);
+            HUB_OnAuthorizeRequest(src, payload, payload_len);
+            break;
+        
+        case EVENT_STATUS_RESPONSE:
+            HUB_OnStatusResponse(src, payload, payload_len);
             break;
 
         default:

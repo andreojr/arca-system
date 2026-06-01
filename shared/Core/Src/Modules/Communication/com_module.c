@@ -85,10 +85,17 @@ void COM_Module_Send(uint8_t dst, uint8_t event, const uint8_t *payload, uint8_t
     tx_buf[2] = s_my_addr;
     memcpy(&tx_buf[3], payload, payload_len);
     TI_send_packet(tx_buf, payload_len + 3);
-    
-    _log_packet("TX", s_my_addr, dst, event, payload, payload_len);
 
-    // Retorna ao RX automaticamente após TX
+    uint32_t deadline = HAL_GetTick() + 200;
+    while (HAL_GPIO_ReadPin(INT_CC1101_GPIO_Port, INT_CC1101_Pin) == GPIO_PIN_RESET && HAL_GetTick() < deadline);   /* aguarda GDO0 subir (TX ativo)    */
+    while (HAL_GPIO_ReadPin(INT_CC1101_GPIO_Port, INT_CC1101_Pin) == GPIO_PIN_SET && HAL_GetTick() < deadline);   /* aguarda GDO0 cair (TX concluído) */
+
+    s_rx_ready = 0;
+    TI_strobe(CCxxx0_SIDLE);
+    TI_strobe(CCxxx0_SFRX);
+    TI_strobe(CCxxx0_SRX);
+
+    _log_packet("TX", s_my_addr, dst, event, payload, payload_len);
 }
 
 void COM_Module_Process(void)

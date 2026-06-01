@@ -7,7 +7,7 @@
 extern SPI_HandleTypeDef hspi1;
 
 static PN532 pn532;
-volatile uint8_t nfc_card_ready = 0;
+extern volatile uint8_t nfc_card_ready;
 
 
 void NFC_Module_Init(void)

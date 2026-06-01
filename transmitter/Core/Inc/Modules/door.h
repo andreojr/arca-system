@@ -18,6 +18,7 @@ typedef enum {
 
 void DOOR_Init(void);
 void DOOR_OnCardRead(const uint8_t *uid, uint8_t uid_len);
+void DOOR_OnStatusRequest(void);
 void DOOR_OnEvent(uint8_t event, const uint8_t *payload, uint8_t payload_len);
 void DOOR_Process(void);
 

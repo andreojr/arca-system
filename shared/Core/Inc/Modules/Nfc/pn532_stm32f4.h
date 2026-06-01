@@ -44,10 +44,13 @@ int PN532_SPI_Wakeup(void);
 void PN532_SPI_Init(PN532* dev);
 int NFC_StartDetection(PN532* dev);
 int NFC_ReadDetection(PN532* dev, uint8_t* uid);
+int  NFC_HwInit(PN532* pn532);
 int  NFC_Begin(PN532* pn532);
+void NFC_StopScan(PN532* pn532);
 void NFC_IRQ_Arm(void);
 void NFC_IRQ_Disarm(void);
 uint8_t NFC_HandleCardEvent(PN532* pn532);
+uint8_t NFC_HandleCardEventOnce(PN532* pn532);
 
 
 #endif  /* PN532_STM32F1 */

@@ -10,6 +10,10 @@ static void _on_rx(uint8_t event, uint8_t src, const uint8_t *payload, uint8_t p
         case EVENT_ACCESS_DENIED:
             DOOR_OnEvent(event, payload, payload_len);
             break;
+        
+        case EVENT_STATUS_REQUEST:
+            DOOR_OnStatusRequest();
+            break;
 
         default:
             break;

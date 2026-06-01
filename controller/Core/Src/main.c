@@ -21,8 +21,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "config.h"
 #include "dispatcher.h"
 #include "com_module.h"
+#include "hub.h"
+#include "pn532.h"
+#include "pn532_stm32f4.h"
+#include <stdint.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,7 +53,10 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+PN532 pn532;
 volatile uint8_t s_rx_ready = 0;
+volatile uint8_t nfc_card_ready = 0;
+uint8_t uart_rx_byte = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,6 +106,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   COM_Module_Init(MY_ADDR);
   DISPATCHER_Init();
+  NFC_HwInit(&pn532);
+  HUB_Init(&pn532);
+  HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
+  // HUB_RequestStatus(ADDR_ROOM_1_EXT);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,6 +120,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     COM_Module_Process();
+    HUB_Process();
   }
   /* USER CODE END 3 */
 }
@@ -413,10 +427,15 @@ int __io_putchar(int ch)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == INT_CC1101_Pin)
-  {
-    s_rx_ready = 1u;
-  }
+    if (GPIO_Pin == INT_CC1101_Pin) s_rx_ready = 1u;
+    if (GPIO_Pin == NFC_INT_Pin)    nfc_card_ready = 1u;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  printf("RX: %c\r\n", uart_rx_byte);
+  HUB_OnUartByte(uart_rx_byte);
+  HAL_UART_Receive_IT(huart, &uart_rx_byte, 1);
 }
 /* USER CODE END 4 */
 

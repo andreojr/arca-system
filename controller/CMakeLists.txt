@@ -50,10 +50,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/Modules/Communication/dw_stm32_delay.c
 
     Core/Src/Modules/Nfc/pn532.c
-    Core/Src/Modules/Nfc/nfc_module.c
     Core/Src/Modules/Nfc/pn532_stm32f4.c
 
     Core/Src/Modules/hub.c
+    Core/Src/Modules/flash_db.c
     Core/Src/Modules/dispatcher.c
 )
 

@@ -246,7 +246,7 @@ int NFC_ReadDetection(PN532* pn532, uint8_t* uid) {
     return uid_len;
 }
 
-int NFC_Begin(PN532* pn532) {
+int NFC_HwInit(PN532* pn532) {
     PN532_SPI_Init(pn532);
 
     uint8_t fwbuf[4];
@@ -257,13 +257,26 @@ int NFC_Begin(PN532* pn532) {
     printf("[PN532] OK, fw %d.%d\r\n", fwbuf[1], fwbuf[2]);
 
     PN532_SamConfiguration(pn532);
+    return PN532_STATUS_OK;
+}
 
+int NFC_Begin(PN532* pn532) {
+    if (NFC_HwInit(pn532) != PN532_STATUS_OK) {
+        return PN532_STATUS_ERROR;
+    }
     NFC_IRQ_Disarm();
     NFC_StartDetection(pn532);
     NFC_IRQ_Arm();
     printf("[PN532] Aguardando cartao...\r\n");
-
     return PN532_STATUS_OK;
+}
+
+void NFC_StopScan(PN532* pn532) {
+    NFC_IRQ_Disarm();
+    nfc_card_ready = 0;
+    PN532_Reset();
+    pn532->wakeup();
+    PN532_SamConfiguration(pn532);
 }
 
 void NFC_IRQ_Arm(void) {
@@ -273,14 +286,11 @@ void NFC_IRQ_Arm(void) {
     HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 }
 
-uint8_t NFC_HandleCardEvent(PN532* pn532) {
+static uint8_t _process_card(PN532* pn532) {
     static uint8_t  last_uid[7]  = {0};
     static uint8_t  last_uid_len = 0;
     static uint32_t last_read_ms = 0;
     uint8_t uid[7];
-
-    NFC_IRQ_Disarm();
-    nfc_card_ready = 0;
 
     int len = NFC_ReadDetection(pn532, uid);
 
@@ -292,7 +302,7 @@ uint8_t NFC_HandleCardEvent(PN532* pn532) {
             }
         }
 
-        uint32_t now        = HAL_GetTick();
+        uint32_t now         = HAL_GetTick();
         uint8_t  in_cooldown = (now - last_read_ms) < NFC_COOLDOWN_MS;
 
         if (!same || !in_cooldown) {
@@ -310,10 +320,23 @@ uint8_t NFC_HandleCardEvent(PN532* pn532) {
         }
     }
 
+    return (uint8_t)(len > 0);
+}
+
+uint8_t NFC_HandleCardEvent(PN532* pn532) {
+    NFC_IRQ_Disarm();
+    nfc_card_ready = 0;
+    uint8_t result = _process_card(pn532);
     NFC_StartDetection(pn532);
     NFC_IRQ_Arm();
+    return result;
+}
 
-    return (uint8_t)(len > 0);
+uint8_t NFC_HandleCardEventOnce(PN532* pn532) {
+    NFC_IRQ_Disarm();
+    nfc_card_ready = 0;
+    return _process_card(pn532);
+    /* chip já está em idle após responder ao InListPassiveTarget */
 }
 
 void NFC_IRQ_Disarm(void) {
