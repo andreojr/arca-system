@@ -17,6 +17,8 @@ O sistema é composto por três tipos de módulos. Para cada sala existem dois m
 
 Os módulos externo e interno **não se comunicam entre si** — ambos falam exclusivamente com o Controlador Central via CC1101.
 
+O firmware é **único** para todos os módulos. O tipo de nó é selecionado em tempo de compilação pela flag `-DMY_ADDR=0xXX`, que define internamente `MODULE_CONTROLLER` ou `MODULE_TRANSMITTER`.
+
 ---
 
 ## Hardware
@@ -43,38 +45,39 @@ Os módulos externo e interno **não se comunicam entre si** — ambos falam exc
 
 ```
 arca/
-├── shared/                          # Drivers e protocolo compartilhados
-│   └── Core/
-│       ├── Inc/Modules/
-│       │   ├── Communication/
-│       │   │   ├── cc1101.h         # Driver CC1101 (registradores, SPI)
-│       │   │   └── com_module.h     # Protocolo de pacotes RF
-│       │   ├── Nfc/
-│       │   │   ├── pn532.h          # Driver PN532 (MIFARE, NTAG2xx)
-│       │   │   ├── pn532_stm32f4.h  # HAL layer STM32 (SPI, IRQ, bit-reversal)
-│       │   │   └── nfc_module.h     # Abstração de alto nível
-│       │   └── config.h             # Endereços de rede e eventos
-│       └── Src/Modules/             # Implementações correspondentes
-│
-├── controller/                      # Firmware — Controlador Central
-│   └── Core/
-│       ├── Inc/Modules/
-│       │   ├── hub.h                # Máquina de estados do controlador
-│       │   └── flash_db.h           # Banco de dados em flash
-│       └── Src/Modules/
-│           ├── dispatcher.c         # Roteamento de eventos RF
-│           ├── hub.c                # Validação de acesso e cadastro
-│           ├── flash_db.c           # Leitura/escrita na flash interna
-│           └── main.c               # Inicialização e loop principal
-│
-└── transmitter/                     # Firmware — Módulo de Porta
-    └── Core/
-        ├── Inc/Modules/
-        │   └── door.h               # Máquina de estados da porta
-        └── Src/Modules/
-            ├── dispatcher.c         # Roteamento de eventos RF
-            ├── door.c               # Lógica de autorização e abertura
-            └── main.c               # Inicialização e loop principal
+└── Core/
+    ├── Inc/
+    │   ├── app.h                            # Entry points da aplicação
+    │   └── Modules/
+    │       ├── config.h                     # Endereços de rede, eventos e seleção de módulo
+    │       ├── dispatcher.h                 # Roteamento de eventos RF
+    │       ├── hub.h                        # Máquina de estados do controlador
+    │       ├── door.h                       # Máquina de estados da porta
+    │       ├── flash_db.h                   # Banco de dados em flash
+    │       ├── dht11.h                      # Driver DHT11
+    │       ├── press.h                      # Sensor de força (ADC)
+    │       ├── Communication/
+    │       │   ├── cc1101.h                 # Driver CC1101 (registradores, SPI)
+    │       │   └── com_module.h             # Protocolo de pacotes RF
+    │       └── Nfc/
+    │           ├── pn532.h                  # Driver PN532 (MIFARE, NTAG2xx)
+    │           └── pn532_stm32f4.h          # HAL layer STM32 (SPI, IRQ, bit-reversal)
+    └── Src/
+        ├── app.c                            # Inicialização e loop principal da aplicação
+        ├── main.c                           # Inicialização HAL, periféricos e ISRs
+        └── Modules/
+            ├── dispatcher.c                 # Roteamento de eventos RF
+            ├── hub.c                        # Validação de acesso e cadastro
+            ├── door.c                       # Lógica de autorização e abertura
+            ├── flash_db.c                   # Leitura/escrita na flash interna
+            ├── dht11.c                      # Driver DHT11 (OneWire)
+            ├── press.c                      # Leitura do sensor de força via ADC
+            ├── Communication/
+            │   ├── cc1101.c                 # Driver CC1101
+            │   └── com_module.c             # Protocolo RF (TX/RX, callbacks)
+            └── Nfc/
+                ├── pn532.c                  # Driver PN532
+                └── pn532_stm32f4.c          # Adaptador STM32 para PN532
 ```
 
 ---
@@ -84,7 +87,7 @@ arca/
 Cada pacote tem o formato:
 
 ```
-[ SRC : 1B ] [ DST : 1B ] [ EVENT : 1B ] [ PAYLOAD : 0–8B ]
+[ DST : 1B ] [ EVENT : 1B ] [ SRC : 1B ] [ PAYLOAD : 0–59B ]
 ```
 
 ### Endereços de Rede (`config.h`)
@@ -93,20 +96,23 @@ Cada pacote tem o formato:
 |---|---|
 | `0x00` | BROADCAST |
 | `0x01` | Controlador Central |
-| `0x11` | Sala 1 — Módulo Externo |
-| `0x12` | Sala 1 — Módulo Interno |
-| `0x21` | Sala 2 — Módulo Externo |
-| `0x22` | Sala 2 — Módulo Interno |
+| `0x11` | Sala 1 — Módulo Externo (entrada) |
+| `0x12` | Sala 1 — Módulo Interno (saída) |
+| `0x21` | Sala 2 — Módulo Externo (entrada) |
+| `0x22` | Sala 2 — Módulo Interno (saída) |
+
+> Os transmissores alternam o próprio endereço entre `0x?1` e `0x?2` após cada abertura de porta, registrando automaticamente o sentido (entrada/saída).
 
 ### Eventos
 
-| Código | Evento | Descrição |
-|---|---|---|
-| `0x01` | `EVENT_AUTHORIZE` | Transmissor solicita autorização (envia UID) |
-| `0x02` | `EVENT_ACCESS_GRANTED` | Controlador libera acesso |
-| `0x03` | `EVENT_ACCESS_DENIED` | Controlador nega acesso |
-| `0x04` | `EVENT_STATUS_REQUEST` | Controlador solicita dados ambientais |
-| `0x05` | `EVENT_STATUS_RESPONSE` | Transmissor responde com temperatura/umidade |
+| Código | Evento | Direção | Descrição |
+|---|---|---|---|
+| `0x01` | `EVENT_AUTHORIZE` | Transmissor → Controlador | Solicita autorização (envia UID) |
+| `0x02` | `EVENT_ACCESS_GRANTED` | Controlador → Transmissor | Acesso liberado |
+| `0x03` | `EVENT_ACCESS_DENIED` | Controlador → Transmissor | Acesso negado |
+| `0x04` | `EVENT_STATUS_REQUEST` | Controlador → Transmissor | Solicita dados ambientais |
+| `0x05` | `EVENT_STATUS_RESPONSE` | Transmissor → Controlador | Responde com temperatura/umidade/porta |
+| `0x06` | `EVENT_ACCESS_CONFIRMED` | Transmissor → Controlador | Porta foi fisicamente aberta |
 
 ### Fluxo de Autorização
 
@@ -116,7 +122,11 @@ Transmissor                          Controlador
     │── EVENT_AUTHORIZE (uid) ──────────►│
     │                                     │  valida UID na flash
     │◄── EVENT_ACCESS_GRANTED ───────────│  (se autorizado)
-    │    (controlador ignora se negado)   │
+    │                                     │
+    │  [sensor de força detecta abertura] │
+    │                                     │
+    │── EVENT_ACCESS_CONFIRMED ─────────►│
+    │                                     │  registra log na flash
 ```
 
 ---
@@ -130,15 +140,17 @@ IDLE ──(NFC lido)──► VALIDATING ──(ACCESS_GRANTED)──► UNLOCK
   ▲                      │                                │                              │
   │                      │(timeout 2s)                    │(timeout 5s)                  │(timeout 5s)
   └──────────────────────┴────────────────────────────────┴──────────────────────────────┘
+                                                                              │(porta aberta > 5s)
+                                                                           [buzzer]
 ```
 
 | Estado | Duração | Descrição |
 |---|---|---|
-| `IDLE` | — | Aguardando cartão NFC (LED azul aceso) |
-| `VALIDATING` | 2 s | Aguarda resposta do controlador via RF |
-| `UNLOCKED` | 5 s | Acesso liberado, aguarda sensor de força |
-| `OPEN` | 5 s | Porta aberta, entrada/saída registrada |
-| `DENIED` | 1 s | Acesso negado (LED vermelho + buzzer) |
+| `DOOR_IDLE` | — | Aguardando cartão NFC |
+| `DOOR_VALIDATING` | 2 s | Aguarda resposta do controlador via RF |
+| `DOOR_UNLOCKED` | 5 s | Acesso liberado (LED verde), aguarda sensor de força |
+| `DOOR_OPEN` | 5 s | Porta aberta; buzzer dispara se não fechar no prazo |
+| `DOOR_DENIED` | 1 s | Acesso negado (LED vermelho + buzzer) |
 
 ### Controlador (`hub.c`)
 
@@ -154,30 +166,49 @@ IDLE ──(NFC lido)──► VALIDATING ──(ACCESS_GRANTED)──► UNLOCK
 
 Utiliza dois setores da flash interna do STM32F411:
 
-| Setor | Endereço | Conteúdo |
-|---|---|---|
-| Setor 6 | `0x08040000` | Tabela de usuários (128 KB) |
-| Setor 7 | `0x08060000` | Log de acessos (128 KB) |
+| Setor | Endereço | Conteúdo | Capacidade |
+|---|---|---|---|
+| Setor 6 | `0x08040000` | Tabela de usuários | 4096 registros |
+| Setor 7 | `0x08060000` | Log de acessos | 4096 registros |
 
-### Registro de Usuário (`FlashUser_t`)
+### Registro de Usuário (`FlashUser_t` — 32 bytes)
 
 ```c
 uint8_t uid[7];       // UID do cartão NFC
 uint8_t uid_len;      // Comprimento do UID
 char    name[21];     // Nome do titular
-uint8_t access_lvl;  // Nível de acesso (sistema S.H.I.E.L.D.)
+uint8_t access_lvl;  // Nível de acesso (reservado)
 uint8_t valid;        // 0xFF=vazio, 0x01=ativo, 0x00=removido (soft-delete)
 ```
 
-### Registro de Log (`FlashLog_t`)
+### Registro de Log (`FlashLog_t` — 32 bytes)
 
 ```c
-uint32_t timestamp;   // Timestamp do evento (RTC)
+uint32_t timestamp;   // Timestamp do evento (RTC — integração pendente)
 uint8_t  uid[7];      // UID do cartão
 uint8_t  uid_len;
 uint8_t  room_id;     // Sala onde ocorreu o evento
-uint8_t  direction;   // Entrada ou saída
+uint8_t  direction;   // 1 = entrada, 2 = saída
 ```
+
+---
+
+## Periféricos (STM32F411)
+
+| Periférico | Pino | Função |
+|---|---|---|
+| SPI1 | PA5/PA6/PA7 | CC1101 + PN532 (NSS por software) |
+| UART1 | PA9/PA10 | Debug (printf) + comandos do controlador |
+| ADC1 CH4 | PA4 | Sensor de força (limiar 2000, debounce 50 ms) |
+| RTC | — | Timestamp de log (LSE 32.768 kHz, inicializado) |
+| GPIO PB9 | LED_GRANTED | LED verde (acesso liberado) |
+| GPIO PB8 | LED_DENIED | LED vermelho (acesso negado) |
+| GPIO PB7 | BUZZER | Buzzer (acesso negado / porta aberta) |
+| GPIO PB6 | DHT11_DATA | Sensor de temperatura/umidade (open-drain) |
+| GPIO PA1 | NFC_INT | Interrupção de cartão NFC (falling edge) |
+| GPIO PB12 | INT_CC1101 | Interrupção RX do CC1101 (falling edge) |
+
+Clock do sistema: **84 MHz** (HSI × PLL).
 
 ---
 
@@ -189,26 +220,25 @@ uint8_t  direction;   // Entrada ou saída
 - [x] Protocolo de pacotes RF com callbacks
 - [x] Driver PN532 completo (SPI, MIFARE Classic, NTAG2xx, bit-reversal LSB)
 - [x] Detecção de cartão NFC via IRQ
+- [x] Driver DHT11 completo (OneWire, validação de checksum, timeout)
+- [x] Sensor de força via ADC (PA4, limiar configurável, debounce 50 ms)
+- [x] LEDs de feedback (verde/vermelho) nos transmissores
+- [x] Buzzer acionado em acesso negado e porta aberta além do timeout
 - [x] Máquina de estados do módulo de porta (5 estados, 4 timeouts)
 - [x] Máquina de estados do controlador (cadastro/remoção via UART)
-- [x] Banco de dados de usuários na flash interna (soft-delete)
-- [x] Log de acessos na flash interna
+- [x] Banco de dados de usuários na flash interna (soft-delete, 4096 slots)
+- [x] Log de acessos na flash interna (4096 entradas)
+- [x] `EVENT_ACCESS_CONFIRMED` — transmissor informa controlador que a porta foi efetivamente aberta
+- [x] Alternância de endereço entrada↔saída após abertura de porta
 - [x] Dispatcher de eventos RF (controller e transmitter)
 - [x] Debug via UART1 (printf redirecionado)
 
 ### Pendente / Em desenvolvimento
 
-- [ ] **DHT11** — integração do driver (código disponível em repositório da equipe, pendente de portagem para este projeto)
-- [ ] **Sensor de força** — integração do driver (código disponível em repositório da equipe, pendente de portagem para este projeto)
-- [ ] **LEDs** — lógica de acionamento dos LEDs (azul/verde/vermelho/porta) nos módulos transmissores; atualmente sem implementação de GPIO para feedback visual
 - [ ] **Display LCD MSP2402** — nenhum driver implementado; será a interface de gerenciamento do controlador central
-- [ ] **RTC** — leitura do timestamp real para preenchimento do campo `timestamp` no log de acesso (periférico inicializado, integração com `FlashDB_LogAdd` pendente)
-- [ ] **Registro de acesso na abertura da porta** — o log deve ser gravado no momento em que o sensor de força detecta a abertura (estado `OPEN`), não na concessão do acesso; requer novo evento RF do transmissor para o controlador informando que a porta foi efetivamente aberta
-- [ ] **Buzzer por porta aberta** — acionar buzzer compartilhado (open-drain) se o sensor de força indicar porta aberta além do timeout do estado `OPEN`
-- [ ] **Validação por nível de acesso** — estrutura de dados existe (`access_lvl`), lógica de comparação com o nível da sala não implementada
-
-### Adicional
-
+- [ ] **RTC no log de acesso** — periférico inicializado, mas o timestamp real ainda não é lido e preenchido em `FlashDB_LogAdd`
+- [ ] **Validação por nível de acesso** — campo `access_lvl` existe na estrutura, lógica de comparação com o nível da sala não implementada
+- [ ] **Status periódico** — `HUB_RequestStatus` é chamado uma vez na inicialização; polling contínuo por `HAL_GetTick` não implementado
 - [ ] **Exportação de logs via UART** — escrita na flash implementada; leitura e envio dos registros para PC via serial não implementada
 
 ---
@@ -217,15 +247,23 @@ uint8_t  direction;   // Entrada ou saída
 
 O projeto usa **STM32CubeMX** para geração de código HAL e **CMake** para build.
 
+O tipo de módulo é definido pela flag `MY_ADDR` passada ao compilador:
+
+| `MY_ADDR` | Módulo compilado |
+|---|---|
+| `0x01` | Controlador Central |
+| `0x11` | Sala 1 — Módulo Externo |
+| `0x12` | Sala 1 — Módulo Interno |
+| `0x21` | Sala 2 — Módulo Externo |
+| `0x22` | Sala 2 — Módulo Interno |
+
 ```bash
-# Controller
-cd controller
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+# Exemplo: compilar como Controlador Central
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMY_ADDR=0x01
 cmake --build build
 
-# Transmitter
-cd transmitter
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+# Exemplo: compilar como Sala 1 - Módulo Externo
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMY_ADDR=0x11
 cmake --build build
 ```
 
