@@ -1,1 +1,0 @@
-../../../../../shared/Core/Inc/Modules/Nfc/pn532.h
