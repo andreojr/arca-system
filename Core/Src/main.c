@@ -358,10 +358,14 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, NFC_NSS_Pin|NSS_CC1101_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DHT11_DATA_Pin|LED_DENIED_Pin|LED_GRANTED_Pin|BUZZER_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DHT11_DATA_Pin|IHM_LED_Pin|LED_DENIED_Pin|LED_GRANTED_Pin
+                          |BUZZER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NFC_RESET_GPIO_Port, NFC_RESET_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, IHM_RESET_Pin|NSS_IHM_Pin|IHM_DC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -376,8 +380,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(NFC_INT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : NFC_NSS_Pin NSS_CC1101_Pin */
-  GPIO_InitStruct.Pin = NFC_NSS_Pin|NSS_CC1101_Pin;
+  /*Configure GPIO pins : NFC_NSS_Pin IHM_RESET_Pin NSS_CC1101_Pin NSS_IHM_Pin
+                           IHM_DC_Pin */
+  GPIO_InitStruct.Pin = NFC_NSS_Pin|IHM_RESET_Pin|NSS_CC1101_Pin|NSS_IHM_Pin
+                          |IHM_DC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -390,8 +396,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(DHT11_DATA_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : NFC_RESET_Pin LED_DENIED_Pin LED_GRANTED_Pin BUZZER_Pin */
-  GPIO_InitStruct.Pin = NFC_RESET_Pin|LED_DENIED_Pin|LED_GRANTED_Pin|BUZZER_Pin;
+  /*Configure GPIO pins : IHM_LED_Pin NFC_RESET_Pin LED_DENIED_Pin LED_GRANTED_Pin
+                           BUZZER_Pin */
+  GPIO_InitStruct.Pin = IHM_LED_Pin|NFC_RESET_Pin|LED_DENIED_Pin|LED_GRANTED_Pin
+                          |BUZZER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

@@ -4,17 +4,24 @@
 #include "flash_db.h"
 #include "pn532_stm32f4.h"
 #include "stm32f4xx_hal.h"
+#include "ihm.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#define TIMEOUT_ENROLLING_MS  10000u
-#define TIMEOUT_DELETING_MS   10000u
+#define TIMEOUT_ENROLLING_MS        10000u
+#define TIMEOUT_DELETING_MS         10000u
+#define STATUS_REQUEST_DELAY_MS     3000u
+#define STATUS_REQUEST_MIN_INTERVAL_MS 5000u
 
 static HubState_t       s_state                  = HUB_IDLE;
 static uint32_t         s_timer                  = 0;
 static PN532           *s_pn532                  = NULL;
 static volatile uint8_t s_start_detection_pending = 0;
+static uint8_t          s_status_pending          = 0;
+static uint8_t          s_status_dst              = 0;
+static uint32_t         s_status_timer            = 0;
+static uint32_t         s_last_status_sent        = 0;
 
 extern volatile uint8_t nfc_card_ready;
 
@@ -62,6 +69,7 @@ void HUB_Init(PN532 *pn532)
 {
     s_pn532 = pn532;
     s_state = HUB_IDLE;
+    IHM_Init();
     printf("[HUB] IDLE\r\n");
 }
 
@@ -88,6 +96,14 @@ void HUB_OnUartByte(uint8_t byte)
 void HUB_Process(void)
 {
     uint32_t now = HAL_GetTick();
+
+    IHM_Process();   /* devolve a tela ao repouso após o timeout */
+
+    if ((now - s_last_status_sent) >= STATUS_REQUEST_DELAY_MS) {
+        s_status_pending = 0;
+        s_last_status_sent = now;
+        HUB_RequestStatus(s_status_dst);
+    }
 
     if (s_start_detection_pending) {
         s_start_detection_pending = 0;
@@ -128,6 +144,16 @@ void HUB_OnAuthorizeRequest(uint8_t src, const uint8_t *uid, uint8_t uid_len)
     if (idx != MAX_FLASH_RECORDS) {
         printf("[HUB] GRANTED -> 0x%02X\r\n", src);
         pkt.event = EVENT_ACCESS_GRANTED;
+
+        uint8_t room      = (src >> 4) & 0x0F;
+        uint8_t direction = src & 0x0F;
+        if (room != 0)
+            IHM_ShowAccessEvent(room, direction, uid, uid_len);
+        if ((HAL_GetTick() - s_last_status_sent) >= STATUS_REQUEST_MIN_INTERVAL_MS) {
+            s_status_pending = 1;
+            s_status_dst     = src;
+            s_status_timer   = HAL_GetTick();
+        }
     } else {
         printf("[HUB] DENIED -> 0x%02X\r\n", src);
         pkt.event = EVENT_ACCESS_DENIED;
@@ -152,7 +178,8 @@ void HUB_OnAccessConfirmed(uint8_t src, const uint8_t *uid, uint8_t uid_len)
         printf(" %02X", uid[i]);
     printf("\r\n");
 
-    /* TODO: exibir no LCD MSP2402 */
+    IHM_ShowAccessEvent(room, direction, uid, uid_len);
+
     /* TODO: registrar log na flash com timestamp RTC e UID */
 }
 
@@ -164,7 +191,14 @@ void HUB_OnStatusResponse(uint8_t src, const uint8_t *payload, uint8_t payload_l
     uint8_t door     = payload[2];
     printf("[HUB] STATUS de 0x%02X — temp=%u grC umidade=%u%%\r\n — Door: %s\r\n",
            src, temp, humidity, door ? "ABERTA" : "FECHADA");
-    /* TODO: exibir no LCD MSP2402 */
+
+    IHM_Status_t st = {
+        .src      = src,
+        .temp     = temp,
+        .humidity = humidity,
+        .door     = door,
+    };
+    IHM_UpdateStatus(&st);
 }
 
 void HUB_RequestStatus(uint8_t dst)
