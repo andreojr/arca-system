@@ -13,6 +13,7 @@ static void ILI9341_Reset() {
     HAL_GPIO_WritePin(ILI9341_RES_GPIO_Port, ILI9341_RES_Pin, GPIO_PIN_RESET);
     HAL_Delay(5);
     HAL_GPIO_WritePin(ILI9341_RES_GPIO_Port, ILI9341_RES_Pin, GPIO_PIN_SET);
+    HAL_Delay(120); // ILI9341 requires 120ms after RESET goes HIGH before accepting commands
 }
 
 static void ILI9341_WriteCommand(uint8_t cmd) {

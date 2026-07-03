@@ -5,6 +5,7 @@
 #include "dispatcher.h"
 #include "pn532.h"
 #include "pn532_stm32f4.h"
+#include "ili9341.h"
 
 static PN532 s_nfc;
 
@@ -24,6 +25,7 @@ extern volatile uint8_t nfc_card_ready;
 
 void APP_Init(void)
 {
+    ILI9341_Unselect(); // deselect display CS before any SPI activity (see ili9341.h)
     COM_Module_Init(MY_ADDR);
     DISPATCHER_Init();
 
