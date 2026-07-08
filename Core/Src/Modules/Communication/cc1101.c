@@ -10,6 +10,7 @@
 
 #include "cc1101.h"
 #include "dw_stm32_delay.h"
+#include <stdio.h>
 
 SPI_HandleTypeDef *hal_spi;
 UART_HandleTypeDef *hal_uart;
@@ -90,27 +91,38 @@ BOOL TI_receive_packet(BYTE *rxBuffer, UINT8 *length)
 {
     BYTE status[2];
     UINT8 packet_len;
+    UINT8 buf_cap = *length;
 
     if (TI_read_status(CCxxx0_RXBYTES) & BYTES_IN_RXFIFO)
     {
         packet_len = TI_read_reg(CCxxx0_RXFIFO);
 
-        if (packet_len <= *length)
+        if (packet_len <= buf_cap)
         {
             TI_read_burst_reg(CCxxx0_RXFIFO, rxBuffer, packet_len);
             *length = packet_len;
             TI_read_burst_reg(CCxxx0_RXFIFO, status, 2);
+            if (!(status[LQI] & CRC_OK)) {
+                printf("[CC1101] RX CRC FAIL len=%u RSSI=%u LQI=0x%02X |", packet_len, status[0], status[LQI]);
+                for (UINT8 i = 0; i < packet_len; i++)
+                    printf(" %02X", rxBuffer[i]);
+                printf("\r\n");
+            }
             return (status[LQI] & CRC_OK);
         }
         else
         {
             *length = packet_len;
+            printf("[CC1101] RX OVERFLOW packet_len=%u > buf=%u\r\n", packet_len, buf_cap);
             TI_strobe(CCxxx0_SIDLE);
             TI_strobe(CCxxx0_SFRX);
             return (FALSE);
         }
     }
-    else return (FALSE);
+    else
+    {
+        return (FALSE);
+    }
 }
 
 void init_serial(UART_HandleTypeDef *huart)

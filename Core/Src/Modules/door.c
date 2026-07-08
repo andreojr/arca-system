@@ -48,6 +48,7 @@ static void _toggle_direction_address(void)
 void DOOR_Init(void)
 {
     s_state = DOOR_IDLE;
+    Press_Init();
     printf("[DOOR] IDLE\r\n");
 }
 

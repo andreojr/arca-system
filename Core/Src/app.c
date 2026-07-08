@@ -33,7 +33,6 @@ void APP_Init(void)
     NFC_HwInit(&s_nfc);
     HUB_Init(&s_nfc);
     HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
-    HUB_RequestStatus(ADDR_ROOM_1_EXT);
     #endif
 
     #ifdef MODULE_TRANSMITTER
