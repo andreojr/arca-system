@@ -4,6 +4,7 @@ from functools import reduce
 from operator import xor
 
 import serial
+import serial.tools.list_ports
 
 from config import SERIAL_BAUD, SERIAL_PORT, SERIAL_TIMEOUT
 
@@ -67,6 +68,23 @@ def send_frame(payload: bytes) -> bytes | None:
         ser.reset_input_buffer()
         ser.write(build_frame(payload))
         return read_frame(ser)
+
+
+def list_usb_ports() -> list[str]:
+    """Portas serial USB conectadas (ignora as ttyS* nativas, que nao tem VID/PID)."""
+    return [p.device for p in serial.tools.list_ports.comports() if p.vid is not None]
+
+
+def probe_port(port: str, payload: bytes, timeout: float = SERIAL_TIMEOUT) -> bytes | None:
+    """Abre uma conexao avulsa em `port`, envia o frame e le a resposta.
+    Usado pra sondar varias portas sem depender da conexao unica global."""
+    try:
+        with serial.Serial(port, SERIAL_BAUD, timeout=timeout) as ser:
+            ser.reset_input_buffer()
+            ser.write(build_frame(payload))
+            return read_frame(ser)
+    except serial.SerialException:
+        return None
 
 
 _CLI_TAG = "[CLI]"

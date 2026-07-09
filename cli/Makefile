@@ -1,7 +1,10 @@
 PYTHON := .venv/bin/python
 
-.DEFAULT_GOAL := sync
-.PHONY: sync enroll delete
+.DEFAULT_GOAL := status
+.PHONY: status sync enroll delete
+
+status:
+	$(PYTHON) -m scripts.status
 
 sync:
 	$(PYTHON) -m scripts.sync_rtc
