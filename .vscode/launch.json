@@ -23,7 +23,7 @@
             "origin": "snippet",
             "cwd": "${workspaceFolder}",
             "preBuild": "${command:st-stm32-ide-debug-launch.build}",
-            "serverSerialNumber": "37FF71064E5734362E6B1543",
+            "serverSerialNumber": "37FF71064E573436E9831043",
             "runEntry": "main",
             "imagesAndSymbols": [
                 {
