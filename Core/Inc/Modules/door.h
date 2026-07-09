@@ -2,6 +2,7 @@
 #define DOOR_H
 
 #include <stdint.h>
+#include "pn532.h"
 
 typedef enum {
     DOOR_IDLE,
@@ -15,8 +16,9 @@ typedef enum {
 #define TIMEOUT_DENIED_MS       1000u
 #define TIMEOUT_UNLOCKED_MS     5000u
 #define TIMEOUT_VALIDATING_MS   2000u
+#define TEST_BATTERY_STEP_MS    1000u
 
-void DOOR_Init(void);
+void DOOR_Init(PN532 *pn532);
 void DOOR_OnCardRead(const uint8_t *uid, uint8_t uid_len);
 void DOOR_SendStatusUpdate(void);
 void DOOR_OnAuthorizeResponse(uint8_t event, const uint8_t *payload, uint8_t payload_len);

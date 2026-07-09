@@ -9,6 +9,9 @@
 #include <string.h>
 #include "config.h"
 #include "stm32f4xx_hal_gpio.h"
+#include "pn532_stm32f4.h"
+#include "cc1101.h"
+#include "uart_protocol.h"
 
 static DoorState_t s_state = DOOR_IDLE;
 static uint32_t s_timer = 0;
@@ -17,6 +20,7 @@ static uint8_t s_uid_len = 0;
 static DHT11_Data_t dht11_data;
 static uint8_t s_buzzer_on = 0;
 static uint8_t s_my_addr_effective = MY_ADDR;
+static PN532  *s_pn532 = NULL;
 
 static void _on_access_confirmed(void)
 {
@@ -45,8 +49,57 @@ static void _toggle_direction_address(void)
     COM_Module_SetAddr(s_my_addr_effective);
 }
 
-void DOOR_Init(void)
+static void _run_test_battery(void)
 {
+    HAL_GPIO_WritePin(LED_DENIED_GPIO_Port, LED_DENIED_Pin, GPIO_PIN_SET);
+    HAL_Delay(TEST_BATTERY_STEP_MS);
+    HAL_GPIO_WritePin(LED_DENIED_GPIO_Port, LED_DENIED_Pin, GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(LED_GRANTED_GPIO_Port, LED_GRANTED_Pin, GPIO_PIN_SET);
+    HAL_Delay(TEST_BATTERY_STEP_MS);
+    HAL_GPIO_WritePin(LED_GRANTED_GPIO_Port, LED_GRANTED_Pin, GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+    HAL_Delay(TEST_BATTERY_STEP_MS);
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+}
+
+static void _send_status(void)
+{
+    uint8_t fw[4]      = {0};
+    uint8_t pn532_ok   = (PN532_GetFirmwareVersion(s_pn532, fw) == PN532_STATUS_OK) ? 1 : 0;
+    uint8_t cc1101_ver = TI_read_status(CCxxx0_VERSION);
+
+    DHT11_Data_t dht = {0};
+    uint8_t dht_ok  = (DHT11_read(&dht) == DHT11_SUCCESS) ? 1 : 0;
+    uint8_t pressed = Press_IsDoorPressed() ? 1 : 0;
+
+    uint8_t resp[10] = {
+        pn532_ok,
+        fw[1],                  /* PN532 fw version   */
+        fw[2],                  /* PN532 fw revision  */
+        cc1101_ver,             /* CC1101 VERSION reg */
+        s_my_addr_effective,    /* endereco deste no  */
+        dht_ok,
+        dht.temperature,
+        dht.humidity,
+        1,                      /* leitura do sensor de forca executada */
+        pressed,
+    };
+    Protocol_Send(resp, sizeof(resp));
+
+    _run_test_battery();
+}
+
+static void _send_identity(void)
+{
+    uint8_t resp[1] = { s_my_addr_effective };
+    Protocol_Send(resp, sizeof(resp));
+}
+
+void DOOR_Init(PN532 *pn532)
+{
+    s_pn532 = pn532;
     s_state = DOOR_IDLE;
     Press_Init();
     printf("[DOOR] IDLE\r\n");
@@ -114,6 +167,16 @@ void DOOR_OnAuthorizeResponse(uint8_t event, const uint8_t *payload, uint8_t pay
 void DOOR_Process(void)
 {
     uint32_t now = HAL_GetTick();
+
+    Protocol_Frame_t frame;
+    if (Protocol_Receive(&frame) && frame.length > 0) {
+        uint8_t cmd = frame.data[0];
+        if (cmd == 'V' || cmd == 'v') {
+            _send_status();
+        } else if (cmd == 'I' || cmd == 'i') {
+            _send_identity();
+        }
+    }
 
     switch (s_state) {
         case DOOR_IDLE:

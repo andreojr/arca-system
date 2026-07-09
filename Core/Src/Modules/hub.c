@@ -1,5 +1,6 @@
 #include "hub.h"
 #include "com_module.h"
+#include "cc1101.h"
 #include "config.h"
 #include "flash_db.h"
 #include "pn532_stm32f4.h"
@@ -60,6 +61,39 @@ static void _on_delete_card(const uint8_t *uid, uint8_t uid_len)
     }
 }
 
+static void _send_status(void)
+{
+    uint8_t fw[4]      = {0};
+    uint8_t pn532_ok   = (PN532_GetFirmwareVersion(s_pn532, fw) == PN532_STATUS_OK) ? 1 : 0;
+    uint8_t cc1101_ver = TI_read_status(CCxxx0_VERSION);
+
+    RTC_ReadCurrent();
+    uint8_t year_2d = (uint8_t)(rtc_status.year > 2000 ? rtc_status.year - 2000 : rtc_status.year);
+
+    uint8_t resp[13] = {
+        pn532_ok,
+        fw[1],              /* PN532 fw version   */
+        fw[2],              /* PN532 fw revision  */
+        cc1101_ver,         /* CC1101 VERSION reg */
+        MY_ADDR,            /* endereco deste no  */
+        rtc_status.hours,
+        rtc_status.minutes,
+        rtc_status.seconds,
+        rtc_status.day,
+        rtc_status.month,
+        year_2d,
+        rtc_status.weekday,
+        rtc_status.is_valid,
+    };
+    Protocol_Send(resp, sizeof(resp));
+}
+
+static void _send_identity(void)
+{
+    uint8_t resp[1] = { MY_ADDR };
+    Protocol_Send(resp, sizeof(resp));
+}
+
 /* ── API pública ───────────────────────────────────────── */
 
 void HUB_Init(PN532 *pn532)
@@ -90,6 +124,12 @@ void HUB_OnUartByte(const Protocol_Frame_t *frame)
         s_start_detection_pending = 1;  /* SPI proibido em ISR — deferido ao HUB_Process */
         printf("[CLI][HUB] DELETING — aproxime o cartao (10s)\r\n");
     }
+    else if (cmd == 'V' || cmd == 'v') {
+        _send_status();
+    }
+    else if (cmd == 'I' || cmd == 'i') {
+        _send_identity();
+    }
 }
 
 void HUB_Process(void)
@@ -101,7 +141,8 @@ void HUB_Process(void)
     Protocol_Frame_t frame;
     if (Protocol_Receive(&frame) && frame.length > 0) {
         uint8_t cmd = frame.data[0];
-        if (cmd == 'C' || cmd == 'c' || cmd == 'D' || cmd == 'd')
+        if (cmd == 'C' || cmd == 'c' || cmd == 'D' || cmd == 'd' || cmd == 'V' || cmd == 'v' ||
+            cmd == 'I' || cmd == 'i')
             HUB_OnUartByte(&frame);
         else
             RTC_API_Process(&frame);

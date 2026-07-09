@@ -19,9 +19,11 @@ extern UART_HandleTypeDef huart1;
 #ifdef MODULE_TRANSMITTER
 #include "door.h"
 #include "dht11.h"
+#include "uart_protocol.h"
 
 extern volatile uint8_t nfc_card_ready;
 extern TIM_HandleTypeDef htim10;
+extern UART_HandleTypeDef huart1;
 
 static volatile uint8_t s_status_pending = 0;
 
@@ -48,10 +50,11 @@ void APP_Init(void)
     #endif
 
     #ifdef MODULE_TRANSMITTER
-    DOOR_Init();
+    DOOR_Init(&s_nfc);
     NFC_SetCardCallback(DOOR_OnCardRead);
     NFC_Begin(&s_nfc);
     DHT11_init();
+    Protocol_Init(&huart1);
 
     __HAL_TIM_SET_AUTORELOAD(&htim10, STATUS_UPDATE_INTERVAL_MS - 1);
     __HAL_TIM_SET_COUNTER(&htim10, STATUS_UPDATE_INTERVAL_MS - 1 - _status_jitter_offset_ms());
@@ -79,18 +82,18 @@ void APP_Run(void)
     #endif
 }
 
-#ifdef MODULE_CONTROLLER
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     Protocol_UART_RxCallback();
 }
-#endif
 
 #ifdef MODULE_TRANSMITTER
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM10) {
         s_status_pending = 1;
     }
 }
+
 #endif
