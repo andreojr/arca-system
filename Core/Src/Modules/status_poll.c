@@ -4,8 +4,6 @@
 #include "stm32f4xx_hal.h"
 #include <stdint.h>
 
-#define STATUS_UPDATE_INTERVAL_MS 10000u
-
 /* Espalha o instante do primeiro envio entre 0..INTERVAL-1 conforme o
  * endereço deste módulo, pra reduzir a chance de duas DOORs transmitirem
  * status ao mesmo tempo (ex.: após um reset simultâneo). Os envios

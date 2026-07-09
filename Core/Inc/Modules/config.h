@@ -16,6 +16,11 @@
 #define EVENT_STATUS_UPDATE     0x04  /* DOOR -> HUB, espontaneo, sem solicitacao previa */
 #define EVENT_ACCESS_CONFIRMED  0x06
 
+/* Intervalo entre dois EVENT_STATUS_UPDATE consecutivos de uma mesma DOOR.
+ * Compartilhado: a DOOR usa pra saber quando reenviar, o HUB usa pra
+ * animar a barra de progresso do display até o próximo status esperado. */
+#define STATUS_UPDATE_INTERVAL_MS 10000u
+
 #ifndef MY_ADDR
 #define MY_ADDR 0x00
 #endif
