@@ -89,7 +89,8 @@ void IHM_Init(void)
 
 
 void IHM_ShowAccessEvent(uint8_t room, uint8_t direction,
-                         const uint8_t *uid, uint8_t uid_len)
+                         const uint8_t *uid, uint8_t uid_len,
+                         const char *timestamp)
 {
     if (!s_ready) return;
 
@@ -113,6 +114,11 @@ void IHM_ShowAccessEvent(uint8_t room, uint8_t direction,
     ILI9341_WriteString(40, IHM_BODY_Y + 24, uid_str, Font_7x10,
                         ILI9341_YELLOW, ILI9341_BLACK);
 
+    if (timestamp != NULL) {
+        ILI9341_WriteString(8, IHM_BODY_Y + 40, timestamp, Font_7x10,
+                            ILI9341_WHITE, ILI9341_BLACK);
+    }
+
     _mark_event();
 }
 
@@ -124,10 +130,12 @@ void IHM_UpdateStatus(const IHM_Status_t *st)
 
     _clear_status_area();
 
-     /*snprintf(line, sizeof(line), "Sala 0x%02X", st->src);
+    uint8_t room = (st->src >> 4) & 0x0F;
+    uint8_t side = st->src & 0x0F;
+    snprintf(line, sizeof(line), "Sala %u (%s)", room, side == 1 ? "EXT" : "INT");
     ILI9341_WriteString(8, IHM_STATUS_Y, line, Font_7x10,
-                        ILI9341_WHITE, ILI9341_BLACK);*/
- 
+                        ILI9341_WHITE, ILI9341_BLACK);
+
     snprintf(line, sizeof(line), "Temp:    %u C", st->temp);
     ILI9341_WriteString(8, IHM_STATUS_Y + 16, line, Font_11x18,
                         ILI9341_WHITE, ILI9341_BLACK);

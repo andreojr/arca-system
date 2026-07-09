@@ -46,7 +46,6 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint8_t uart_rx_byte = 0u;
 volatile uint8_t s_rx_ready = 0u;
 volatile uint8_t nfc_card_ready = 0u;
 /* USER CODE END PV */

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "pn532.h"
+#include "uart_protocol.h"
 
 typedef enum {
     HUB_IDLE,
@@ -12,11 +13,10 @@ typedef enum {
 
 void HUB_Init(PN532 *pn532);
 void HUB_Process(void);
-void HUB_OnUartByte(uint8_t byte);
+void HUB_OnUartByte(const Protocol_Frame_t *frame);
 
 void HUB_OnAuthorizeRequest(uint8_t src, const uint8_t *uid, uint8_t uid_len);
 void HUB_OnAccessConfirmed(uint8_t src, const uint8_t *uid, uint8_t uid_len);
-void HUB_OnStatusResponse(uint8_t src, const uint8_t *payload, uint8_t payload_len);
-void HUB_RequestStatus(uint8_t dst);
+void HUB_OnStatusUpdate(uint8_t src, const uint8_t *payload, uint8_t payload_len);
 
 #endif /* HUB_H */

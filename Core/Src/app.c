@@ -11,14 +11,15 @@ static PN532 s_nfc;
 
 #ifdef MODULE_CONTROLLER
 #include "hub.h"
+#include "uart_protocol.h"
 
 extern UART_HandleTypeDef huart1;
-extern uint8_t uart_rx_byte;
 #endif
 
 #ifdef MODULE_TRANSMITTER
 #include "door.h"
 #include "dht11.h"
+#include "status_poll.h"
 
 extern volatile uint8_t nfc_card_ready;
 #endif
@@ -32,7 +33,7 @@ void APP_Init(void)
     #ifdef MODULE_CONTROLLER
     NFC_HwInit(&s_nfc);
     HUB_Init(&s_nfc);
-    HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
+    Protocol_Init(&huart1);
     #endif
 
     #ifdef MODULE_TRANSMITTER
@@ -56,13 +57,13 @@ void APP_Run(void)
         NFC_HandleCardEvent(&s_nfc);
     }
     DOOR_Process();
+    StatusPoll_Process();
     #endif
 }
 
 #ifdef MODULE_CONTROLLER
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    HUB_OnUartByte(uart_rx_byte);
-    HAL_UART_Receive_IT(huart, &uart_rx_byte, 1);
+    Protocol_UART_RxCallback();
 }
 #endif

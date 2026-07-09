@@ -13,8 +13,7 @@
 #define EVENT_AUTHORIZE         0x01
 #define EVENT_ACCESS_GRANTED    0x02
 #define EVENT_ACCESS_DENIED     0x03
-#define EVENT_STATUS_REQUEST    0x04
-#define EVENT_STATUS_RESPONSE   0x05
+#define EVENT_STATUS_UPDATE     0x04  /* DOOR -> HUB, espontaneo, sem solicitacao previa */
 #define EVENT_ACCESS_CONFIRMED  0x06
 
 #ifndef MY_ADDR

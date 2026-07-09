@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Dados ambientais de uma sala, recebidos via EVENT_STATUS_RESPONSE. */
+/* Dados ambientais de uma sala, recebidos via EVENT_STATUS_UPDATE. */
 typedef struct {
     uint8_t src;       /* endereço de origem (0x?1/0x?2) */
     uint8_t temp;      /* temperatura em °C              */
@@ -20,9 +20,12 @@ void IHM_ShowIdle(void);
 /* Atualiza o bloco de status ambiental (temp/umidade/porta). */
 void IHM_UpdateStatus(const IHM_Status_t *st);
 
-/* Mostra um evento de acesso confirmado (entrada/saída de uma sala). */
+/* Mostra um evento de acesso confirmado (entrada/saída de uma sala).
+ * `timestamp` (pode ser NULL) é desenhado abaixo do UID, já formatado
+ * (ver RTC_ReadCurrent / rtc_status em rtc_sync.h). */
 void IHM_ShowAccessEvent(uint8_t room, uint8_t direction,
-                         const uint8_t *uid, uint8_t uid_len);
+                         const uint8_t *uid, uint8_t uid_len,
+                         const char *timestamp);
 
 /* Deve ser chamada periodicamente (no loop, via HUB_Process). Após
  * IHM_EVENT_TIMEOUT_MS sem evento novo, a tela volta ao repouso. */
