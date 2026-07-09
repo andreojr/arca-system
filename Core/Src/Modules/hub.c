@@ -28,7 +28,7 @@ static void _on_enroll_card(const uint8_t *uid, uint8_t uid_len)
 {
     uint32_t idx = FlashDB_UserFindUID(uid, uid_len);
     if (idx != MAX_FLASH_RECORDS) {
-        printf("[HUB] ENROLLING — cartao ja cadastrado\r\n");
+        printf("[CLI][HUB] ENROLLING — cartao ja cadastrado\r\n");
         return;
     }
 
@@ -39,9 +39,9 @@ static void _on_enroll_card(const uint8_t *uid, uint8_t uid_len)
     strncpy(user.name, "default", sizeof(user.name) - 1);
 
     if (FlashDB_UserAdd(&user)) {
-        printf("[HUB] ENROLLING — cartao cadastrado\r\n");
+        printf("[CLI][HUB] ENROLLING — cartao cadastrado\r\n");
     } else {
-        printf("[HUB] ENROLLING — erro ao gravar flash\r\n");
+        printf("[CLI][HUB] ENROLLING — erro ao gravar flash\r\n");
     }
 }
 
@@ -49,14 +49,14 @@ static void _on_delete_card(const uint8_t *uid, uint8_t uid_len)
 {
     uint32_t idx = FlashDB_UserFindUID(uid, uid_len);
     if (idx == MAX_FLASH_RECORDS) {
-        printf("[HUB] DELETING — cartao nao encontrado\r\n");
+        printf("[CLI][HUB] DELETING — cartao nao encontrado\r\n");
         return;
     }
 
     if (FlashDB_UserDelete(idx)) {
-        printf("[HUB] DELETING — cartao removido\r\n");
+        printf("[CLI][HUB] DELETING — cartao removido\r\n");
     } else {
-        printf("[HUB] DELETING — erro ao deletar\r\n");
+        printf("[CLI][HUB] DELETING — erro ao deletar\r\n");
     }
 }
 
@@ -81,14 +81,14 @@ void HUB_OnUartByte(const Protocol_Frame_t *frame)
         s_timer = HAL_GetTick();
         NFC_SetCardCallback(_on_enroll_card);
         s_start_detection_pending = 1;  /* SPI proibido em ISR — deferido ao HUB_Process */
-        printf("[HUB] ENROLLING — aproxime o cartao (10s)\r\n");
+        printf("[CLI][HUB] ENROLLING — aproxime o cartao (10s)\r\n");
     }
     else if (cmd == 'D' || cmd == 'd') {
         s_state = HUB_DELETING;
         s_timer = HAL_GetTick();
         NFC_SetCardCallback(_on_delete_card);
         s_start_detection_pending = 1;  /* SPI proibido em ISR — deferido ao HUB_Process */
-        printf("[HUB] DELETING — aproxime o cartao (10s)\r\n");
+        printf("[CLI][HUB] DELETING — aproxime o cartao (10s)\r\n");
     }
 }
 
@@ -123,7 +123,7 @@ void HUB_Process(void)
             if ((now - s_timer) >= TIMEOUT_ENROLLING_MS) {
                 NFC_StopScan(s_pn532);
                 s_state = HUB_IDLE;
-                printf("[HUB] timeout -> IDLE\r\n");
+                printf("[CLI][HUB] timeout -> IDLE\r\n");
                 break;
             }
             if (nfc_card_ready) {
