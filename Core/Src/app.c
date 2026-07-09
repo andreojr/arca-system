@@ -19,9 +19,20 @@ extern UART_HandleTypeDef huart1;
 #ifdef MODULE_TRANSMITTER
 #include "door.h"
 #include "dht11.h"
-#include "status_poll.h"
 
 extern volatile uint8_t nfc_card_ready;
+extern TIM_HandleTypeDef htim10;
+
+static volatile uint8_t s_status_pending = 0;
+
+/* Espalha o instante do primeiro STATUS_UPDATE conforme o endereço deste
+ * módulo, pra reduzir a chance de duas DOORs transmitirem ao mesmo tempo
+ * (ex.: após um reset simultâneo). Os envios seguintes ficam a cargo do
+ * próprio TIM10, que recarrega em STATUS_UPDATE_INTERVAL_MS a partir daí. */
+static uint32_t _status_jitter_offset_ms(void)
+{
+    return ((uint32_t)MY_ADDR * 977u) % STATUS_UPDATE_INTERVAL_MS;
+}
 #endif
 
 void APP_Init(void)
@@ -41,6 +52,10 @@ void APP_Init(void)
     NFC_SetCardCallback(DOOR_OnCardRead);
     NFC_Begin(&s_nfc);
     DHT11_init();
+
+    __HAL_TIM_SET_AUTORELOAD(&htim10, STATUS_UPDATE_INTERVAL_MS - 1);
+    __HAL_TIM_SET_COUNTER(&htim10, STATUS_UPDATE_INTERVAL_MS - 1 - _status_jitter_offset_ms());
+    HAL_TIM_Base_Start_IT(&htim10);
     #endif
 }
 
@@ -56,8 +71,11 @@ void APP_Run(void)
     if (nfc_card_ready) {
         NFC_HandleCardEvent(&s_nfc);
     }
+    if (s_status_pending) {
+        s_status_pending = 0;
+        DOOR_SendStatusUpdate();
+    }
     DOOR_Process();
-    StatusPoll_Process();
     #endif
 }
 
@@ -65,5 +83,14 @@ void APP_Run(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     Protocol_UART_RxCallback();
+}
+#endif
+
+#ifdef MODULE_TRANSMITTER
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM10) {
+        s_status_pending = 1;
+    }
 }
 #endif

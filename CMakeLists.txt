@@ -56,7 +56,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/Modules/door.c
     Core/Src/Modules/hub.c
     Core/Src/Modules/dispatcher.c
-    Core/Src/Modules/status_poll.c
     Core/Src/Modules/uart_protocol.c
 
     Core/Src/Modules/RTC/rtc_sync.c
