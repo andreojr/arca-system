@@ -59,9 +59,13 @@ arca/
     │       ├── Communication/
     │       │   ├── cc1101.h                 # Driver CC1101 (registradores, SPI)
     │       │   └── com_module.h             # Protocolo de pacotes RF
-    │       └── Nfc/
-    │           ├── pn532.h                  # Driver PN532 (MIFARE, NTAG2xx)
-    │           └── pn532_stm32f4.h          # HAL layer STM32 (SPI, IRQ, bit-reversal)
+    │       ├── Nfc/
+    │       │   ├── pn532.h                  # Driver PN532 (MIFARE, NTAG2xx)
+    │       │   └── pn532_stm32f4.h          # HAL layer STM32 (SPI, IRQ, bit-reversal)
+    │       └── IHM/
+    │           ├── ihm.h                    # Interface do display (IHM_Status_t, funções públicas)
+    │           ├── ili9341.h                # Driver ILI9341 (pinos, cores, API)
+    │           └── fonts.h                  # Definição de fontes bitmap
     └── Src/
         ├── app.c                            # Inicialização e loop principal da aplicação
         ├── main.c                           # Inicialização HAL, periféricos e ISRs
@@ -75,9 +79,13 @@ arca/
             ├── Communication/
             │   ├── cc1101.c                 # Driver CC1101
             │   └── com_module.c             # Protocolo RF (TX/RX, callbacks)
-            └── Nfc/
-                ├── pn532.c                  # Driver PN532
-                └── pn532_stm32f4.c          # Adaptador STM32 para PN532
+            ├── Nfc/
+            │   ├── pn532.c                  # Driver PN532
+            │   └── pn532_stm32f4.c          # Adaptador STM32 para PN532
+            └── IHM/
+                ├── ihm.c                    # Interface do display (telas idle/evento/status)
+                ├── ili9341.c                # Driver SPI do ILI9341 (240×320)
+                └── fonts.c                  # Fontes bitmap (7×10, 11×18)
 ```
 
 ---
@@ -197,16 +205,20 @@ uint8_t  direction;   // 1 = entrada, 2 = saída
 
 | Periférico | Pino | Função |
 |---|---|---|
-| SPI1 | PA5/PA6/PA7 | CC1101 + PN532 (NSS por software) |
+| SPI1 | PA5/PA6/PA7 | CC1101 + PN532 + ILI9341 (NSS por software) |
 | UART1 | PA9/PA10 | Debug (printf) + comandos do controlador |
 | ADC1 CH4 | PA4 | Sensor de força (limiar 2000, debounce 50 ms) |
 | RTC | — | Timestamp de log (LSE 32.768 kHz, inicializado) |
-| GPIO PB9 | LED_GRANTED | LED verde (acesso liberado) |
-| GPIO PB8 | LED_DENIED | LED vermelho (acesso negado) |
-| GPIO PB7 | BUZZER | Buzzer (acesso negado / porta aberta) |
-| GPIO PB6 | DHT11_DATA | Sensor de temperatura/umidade (open-drain) |
+| GPIO PB13 | LED_GRANTED | LED verde (acesso liberado) |
+| GPIO PB12 | LED_DENIED | LED vermelho (acesso negado) |
+| GPIO PB3 | BUZZER | Buzzer (acesso negado / porta aberta) |
+| GPIO PB0 | DHT11_DATA | Sensor de temperatura/umidade (open-drain) |
 | GPIO PA1 | NFC_INT | Interrupção de cartão NFC (falling edge) |
-| GPIO PB12 | INT_CC1101 | Interrupção RX do CC1101 (falling edge) |
+| GPIO PB15 | INT_CC1101 | Interrupção RX do CC1101 (falling edge) |
+| GPIO PA8 | IHM_RESET | Reset do display ILI9341 |
+| GPIO PA11 | NSS_IHM | Chip select do display ILI9341 |
+| GPIO PA12 | IHM_DC | Data/Command do display ILI9341 |
+| GPIO PB1 | IHM_LED | Retroiluminação do display |
 
 Clock do sistema: **84 MHz** (HSI × PLL).
 
@@ -232,10 +244,10 @@ Clock do sistema: **84 MHz** (HSI × PLL).
 - [x] Alternância de endereço entrada↔saída após abertura de porta
 - [x] Dispatcher de eventos RF (controller e transmitter)
 - [x] Debug via UART1 (printf redirecionado)
+- [x] Display MSP2402 (ILI9341, 240×320) — driver SPI completo, tela de repouso, evento de acesso (sala/direção/UID) e bloco de status ambiental (temp/umidade/porta); retorno automático ao repouso após 5 s
 
 ### Pendente / Em desenvolvimento
 
-- [ ] **Display LCD MSP2402** — nenhum driver implementado; será a interface de gerenciamento do controlador central
 - [ ] **RTC no log de acesso** — periférico inicializado, mas o timestamp real ainda não é lido e preenchido em `FlashDB_LogAdd`
 - [ ] **Validação por nível de acesso** — campo `access_lvl` existe na estrutura, lógica de comparação com o nível da sala não implementada
 - [ ] **Status periódico** — `HUB_RequestStatus` é chamado uma vez na inicialização; polling contínuo por `HAL_GetTick` não implementado

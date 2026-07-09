@@ -56,12 +56,20 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/Modules/door.c
     Core/Src/Modules/hub.c
     Core/Src/Modules/dispatcher.c
+    Core/Src/Modules/uart_protocol.c
+
+    Core/Src/Modules/RTC/rtc_sync.c
+    Core/Src/Modules/RTC/rtc_api.c
 
     Core/Src/Modules/dht11.c
     Core/Src/Modules/press.c
-    
+
     Core/Src/Modules/flash_db.c
     Core/Src/app.c
+
+    Core/Src/Modules/IHM/ihm.c
+    Core/Src/Modules/IHM/ili9341.c
+    Core/Src/Modules/IHM/fonts.c
 )
 
 # Add include paths
@@ -71,6 +79,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Inc/Modules
     Core/Inc/Modules/Nfc
     Core/Inc/Modules/Communication
+    Core/Inc/Modules/IHM
+    Core/Inc/Modules/RTC
 )
 
 # Add project symbols (macros)

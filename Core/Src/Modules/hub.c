@@ -4,12 +4,16 @@
 #include "flash_db.h"
 #include "pn532_stm32f4.h"
 #include "stm32f4xx_hal.h"
+#include "ihm.h"
+#include "uart_protocol.h"
+#include "rtc_sync.h"
+#include "rtc_api.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#define TIMEOUT_ENROLLING_MS  10000u
-#define TIMEOUT_DELETING_MS   10000u
+#define TIMEOUT_ENROLLING_MS        10000u
+#define TIMEOUT_DELETING_MS         10000u
 
 static HubState_t       s_state                  = HUB_IDLE;
 static uint32_t         s_timer                  = 0;
@@ -62,21 +66,24 @@ void HUB_Init(PN532 *pn532)
 {
     s_pn532 = pn532;
     s_state = HUB_IDLE;
+    IHM_Init();
     printf("[HUB] IDLE\r\n");
 }
 
-void HUB_OnUartByte(uint8_t byte)
+void HUB_OnUartByte(const Protocol_Frame_t *frame)
 {
     if (s_state != HUB_IDLE) return;
 
-    if (byte == 'C' || byte == 'c') {
+    uint8_t cmd = frame->data[0];
+
+    if (cmd == 'C' || cmd == 'c') {
         s_state = HUB_ENROLLING;
         s_timer = HAL_GetTick();
         NFC_SetCardCallback(_on_enroll_card);
         s_start_detection_pending = 1;  /* SPI proibido em ISR — deferido ao HUB_Process */
         printf("[HUB] ENROLLING — aproxime o cartao (10s)\r\n");
     }
-    else if (byte == 'D' || byte == 'd') {
+    else if (cmd == 'D' || cmd == 'd') {
         s_state = HUB_DELETING;
         s_timer = HAL_GetTick();
         NFC_SetCardCallback(_on_delete_card);
@@ -88,6 +95,17 @@ void HUB_OnUartByte(uint8_t byte)
 void HUB_Process(void)
 {
     uint32_t now = HAL_GetTick();
+
+    IHM_Process();   /* devolve a tela ao repouso após o timeout */
+
+    Protocol_Frame_t frame;
+    if (Protocol_Receive(&frame) && frame.length > 0) {
+        uint8_t cmd = frame.data[0];
+        if (cmd == 'C' || cmd == 'c' || cmd == 'D' || cmd == 'd')
+            HUB_OnUartByte(&frame);
+        else
+            RTC_API_Process(&frame);
+    }
 
     if (s_start_detection_pending) {
         s_start_detection_pending = 0;
@@ -125,14 +143,21 @@ void HUB_OnAuthorizeRequest(uint8_t src, const uint8_t *uid, uint8_t uid_len)
     COM_TxPacket_t pkt = {0};
     pkt.dst = src;
 
-    if (idx != MAX_FLASH_RECORDS) {
+    uint8_t granted = (idx != MAX_FLASH_RECORDS);
+    pkt.event = granted ? EVENT_ACCESS_GRANTED : EVENT_ACCESS_DENIED;
+
+    /* Envia a resposta pelo rádio ANTES de qualquer desenho no display:
+     * IHM_ShowAccessEvent() faz várias escritas SPI no ILI9341 e podia
+     * atrasar o pacote além do TIMEOUT_VALIDATING_MS do door. */
+    COM_Module_Send(&pkt);
+
+    if (granted) {
         printf("[HUB] GRANTED -> 0x%02X\r\n", src);
-        pkt.event = EVENT_ACCESS_GRANTED;
+        /* Display só atualiza em HUB_OnAccessConfirmed, quando o usuário
+         * de fato abre a porta. */
     } else {
         printf("[HUB] DENIED -> 0x%02X\r\n", src);
-        pkt.event = EVENT_ACCESS_DENIED;
     }
-    COM_Module_Send(&pkt);
 }
 
 void HUB_OnAccessConfirmed(uint8_t src, const uint8_t *uid, uint8_t uid_len)
@@ -152,28 +177,29 @@ void HUB_OnAccessConfirmed(uint8_t src, const uint8_t *uid, uint8_t uid_len)
         printf(" %02X", uid[i]);
     printf("\r\n");
 
-    /* TODO: exibir no LCD MSP2402 */
-    /* TODO: registrar log na flash com timestamp RTC e UID */
+    RTC_ReadCurrent();
+    char timestamp[24];
+    snprintf(timestamp, sizeof(timestamp), "%02u:%02u:%02u %02u/%02u/%02u",
+             rtc_status.hours, rtc_status.minutes, rtc_status.seconds,
+             rtc_status.day, rtc_status.month, rtc_status.year % 100);
+
+    IHM_ShowAccessEvent(room, direction, uid, uid_len, timestamp);
 }
 
-void HUB_OnStatusResponse(uint8_t src, const uint8_t *payload, uint8_t payload_len)
+void HUB_OnStatusUpdate(uint8_t src, const uint8_t *payload, uint8_t payload_len)
 {
     if (payload_len < 3) return;
     uint8_t temp     = payload[0];
     uint8_t humidity = payload[1];
     uint8_t door     = payload[2];
-    printf("[HUB] STATUS de 0x%02X — temp=%u grC umidade=%u%%\r\n — Door: %s\r\n",
+    printf("[HUB] STATUS_UPDATE de 0x%02X — temp=%u grC umidade=%u%%\r\n — Door: %s\r\n",
            src, temp, humidity, door ? "ABERTA" : "FECHADA");
-    /* TODO: exibir no LCD MSP2402 */
-}
 
-void HUB_RequestStatus(uint8_t dst)
-{
-    printf("[HUB] STATUS_REQUEST -> 0x%02X\r\n", dst);
-    COM_TxPacket_t pkt = {
-        .dst = dst,
-        .event = EVENT_STATUS_REQUEST
+    IHM_Status_t st = {
+        .src      = src,
+        .temp     = temp,
+        .humidity = humidity,
+        .door     = door,
     };
-    COM_Module_Send(&pkt);
-    /* TODO: chamar periodicamente com HAL_GetTick() */
+    IHM_UpdateStatus(&st);
 }

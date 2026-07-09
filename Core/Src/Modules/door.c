@@ -48,6 +48,7 @@ static void _toggle_direction_address(void)
 void DOOR_Init(void)
 {
     s_state = DOOR_IDLE;
+    Press_Init();
     printf("[DOOR] IDLE\r\n");
 }
 
@@ -72,10 +73,8 @@ void DOOR_OnCardRead(const uint8_t *uid, uint8_t uid_len)
     COM_Module_Send(&pkt);
 }
 
-void DOOR_OnStatusRequest(void)
+void DOOR_SendStatusUpdate(void)
 {
-    printf("[DOOR] STATUS_REQUEST recebido\r\n");
-
     DHT11_read(&dht11_data);
 
     uint8_t payload[4];
@@ -85,12 +84,12 @@ void DOOR_OnStatusRequest(void)
 
     COM_TxPacket_t pkt = {
         .dst = ADDR_CONTROLLER,
-        .event = EVENT_STATUS_RESPONSE,
+        .event = EVENT_STATUS_UPDATE,
         .payload_len = 3
     };
     memcpy(pkt.payload, payload, 3);
     COM_Module_Send(&pkt);
-    printf("[DOOR] STATUS_RESPONSE enviado\r\n");
+    printf("[DOOR] STATUS_UPDATE enviado\r\n");
 }
 
 void DOOR_OnAuthorizeResponse(uint8_t event, const uint8_t *payload, uint8_t payload_len)
