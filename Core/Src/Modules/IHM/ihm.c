@@ -3,6 +3,7 @@
 #include "config.h"
 #include "main.h"
 #include "stm32f4xx_hal.h"
+#include "icons.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,8 +15,8 @@
  *   +----------------------------------+  y=0
  *   |            A.R.C.A.              |   cabeçalho (faixa, fixo)
  *   +----------------------------------+  y=40
- *   |  SALA n  ENTRADA / SAIDA        |   linha de evento  ─┐
- *   |  UID: XX XX XX XX               |                     │ corpo
+ *   |  SALA n  ENTRADA / SAIDA         |   linha de evento  ─┐
+ *   |  UID: XX XX XX XX                |                     │ corpo
  *   |                                  |                     │ (limpo no
  *   |  Temp:    NN C                   |   bloco de status   │  repouso)
  *   |  Umidade: NN %                   |                     │
@@ -26,10 +27,29 @@
  * (acesso ou status) e, após IHM_EVENT_TIMEOUT_MS sem evento novo,
  * volta sozinho ao estado de repouso ("Aguardando..."). A retroiluminação
  * permanece ligada o tempo todo.
+ *
+ * Redesenho: o bloco de status é redesenhado por diff — só o campo que
+ * mudou é limpo e reescrito. O ícone de cada linha só é redesenhado
+ * quando a categoria muda (temp: frio/normal/quente; porta: aberta/
+ * fechada); a umidade tem ícone fixo, redesenhado uma vez no full_redraw.
  */
+
 #define IHM_HEADER_H           40u
 #define IHM_BODY_Y             (IHM_HEADER_H + 8u)
 #define IHM_STATUS_Y           (IHM_BODY_Y + 60u)
+
+#define IHM_ICON_X             8u
+#define IHM_TEXT_X             48u
+#define IHM_ICON_SIZE          32u
+
+/* Linha de "Sala n (INT/EXT)" fica sem ícone; as 3 linhas de status
+ * (temp/umidade/porta) precisam de espaço pro ícone de 32px. */
+#define IHM_TEMP_Y             (IHM_STATUS_Y + 18u)
+#define IHM_HUMIDITY_Y         (IHM_TEMP_Y + 35u)
+#define IHM_DOOR_Y             (IHM_HUMIDITY_Y + 35u)
+
+#define IHM_TEMP_LIMIAR_FRIO    24u
+#define IHM_TEMP_LIMIAR_QUENTE  28u
 
 /* Tempo que um evento permanece na tela antes de voltar ao repouso. */
 #define IHM_EVENT_TIMEOUT_MS   5000u
@@ -41,14 +61,28 @@
 #define IHM_BAR_Y              (ILI9341_HEIGHT - 12u)
 #define IHM_BAR_W              (ILI9341_WIDTH - 2u * IHM_BAR_MARGIN)
 
-static uint8_t  s_ready         = 0;  /* display inicializado            */
-static uint8_t  s_showing_event = 0;  /* há evento na tela aguardando expirar */
-static uint32_t s_event_ts      = 0;  /* HAL_GetTick() do último evento  */
+/* Ícones */
+extern const uint16_t temp_quente[];
+extern const uint16_t temp_padrao[];
+extern const uint16_t temp_frio[];
+extern const uint16_t umidade[];
+extern const uint16_t porta_fechada[];
+extern const uint16_t porta_aberta[];
 
-static uint8_t      s_has_status     = 0;  /* já recebemos algum STATUS_UPDATE */
-static IHM_Status_t s_last_status;        /* último status desenhado, p/ diff */
-static uint32_t     s_bar_start_tick = 0;  /* tick do último STATUS_UPDATE     */
-static uint16_t     s_bar_filled_px  = 0;  /* largura já pintada da barra      */
+typedef enum {
+    IHM_TEMP_CAT_FRIO = 0,
+    IHM_TEMP_CAT_NORMAL,
+    IHM_TEMP_CAT_QUENTE
+} IHM_TempCat_t;
+
+static uint8_t  s_ready         = 0;        /* display inicializado            */
+static uint8_t  s_showing_event = 0;        /* há evento na tela aguardando expirar */
+static uint32_t s_event_ts      = 0;        /* HAL_GetTick() do último evento  */
+
+static uint8_t      s_has_status     = 0;   /* já recebemos algum STATUS_UPDATE */
+static IHM_Status_t s_last_status;          /* último status desenhado, p/ diff */
+static uint32_t     s_bar_start_tick = 0;   /* tick do último STATUS_UPDATE     */
+static uint16_t     s_bar_filled_px  = 0;   /* largura já pintada da barra      */
 
 /* Marca que um evento acabou de ser desenhado (rearma o timer). */
 static void _mark_event(void)
@@ -75,12 +109,17 @@ static void _clear_status_area(void)
     _clear_status_area();
 } */
 
-/* Limpa só a linha (largura da área de status, altura da fonte) antes de
- * reescrever um único campo — evita sobra de caractere quando o novo
- * texto é mais curto que o anterior (ex.: "100" -> "9"). */
-static void _clear_line(uint16_t y, uint8_t height)
+/* Limpa só a coluna de texto de uma linha com ícone */
+static void _clear_row_text(uint16_t y)
 {
-    ILI9341_FillRectangle(8, y, ILI9341_WIDTH - 16, height, ILI9341_BLACK);
+    ILI9341_FillRectangle(IHM_TEXT_X, y, ILI9341_WIDTH - IHM_TEXT_X - 8,
+                          IHM_ICON_SIZE, ILI9341_BLACK);
+}
+
+/* Limpa ícone + texto de uma linha inteira */
+static void _clear_row_full(uint16_t y)
+{
+    ILI9341_FillRectangle(0, y, ILI9341_WIDTH, IHM_ICON_SIZE, ILI9341_BLACK);
 }
 
 static void _bar_reset(void)
@@ -90,8 +129,7 @@ static void _bar_reset(void)
     s_bar_start_tick = HAL_GetTick();
 }
 
-/* Pinta só a fatia nova da barra desde o último avanço — nunca redesenha
- * a barra inteira. */
+/* Pinta só a fatia nova da barra desde o último avanço */
 static void _bar_advance(void)
 {
     uint32_t elapsed    = HAL_GetTick() - s_bar_start_tick;
@@ -111,6 +149,31 @@ static void _draw_header(void)
     ILI9341_FillScreen(ILI9341_BLACK);
     ILI9341_FillRectangle(0, 0, ILI9341_WIDTH, IHM_HEADER_H, ILI9341_BLUE);
     ILI9341_WriteString(70, 12, "A.R.C.A.", Font_11x18, ILI9341_WHITE, ILI9341_BLUE);
+}
+
+static IHM_TempCat_t _temp_category(uint8_t temp)
+{
+    if (temp >= IHM_TEMP_LIMIAR_QUENTE) return IHM_TEMP_CAT_QUENTE;
+    if (temp <= IHM_TEMP_LIMIAR_FRIO)   return IHM_TEMP_CAT_FRIO;
+    return IHM_TEMP_CAT_NORMAL;
+}
+
+static const uint16_t *_temp_icon(IHM_TempCat_t cat)
+{
+    switch (cat) {
+        case IHM_TEMP_CAT_QUENTE: return temp_quente;
+        case IHM_TEMP_CAT_FRIO:   return temp_frio;
+        default:                  return temp_padrao;
+    }
+}
+
+static uint16_t _temp_color(IHM_TempCat_t cat)
+{
+    switch (cat) {
+        case IHM_TEMP_CAT_QUENTE: return ILI9341_RED;
+        case IHM_TEMP_CAT_FRIO:   return ILI9341_CYAN;
+        default:                  return ILI9341_WHITE;
+    }
 }
 
 void IHM_ShowIdle(void)
@@ -184,28 +247,46 @@ void IHM_UpdateStatus(const IHM_Status_t *st)
                             ILI9341_WHITE, ILI9341_BLACK);
     }
 
-    if (full_redraw || st->temp != s_last_status.temp) {
-        if (!full_redraw) _clear_line(IHM_STATUS_Y + 16, Font_11x18.height);
+    /* Temperatura — ícone só é redesenhado se a categoria mudou */
+    IHM_TempCat_t cat = _temp_category(st->temp);
+    uint8_t temp_icon_changed = full_redraw || cat != s_last_temp_cat;
+
+    if (temp_icon_changed) {
+        if (!full_redraw) _clear_row_full(IHM_TEMP_Y);
+        ILI9341_DrawImage(IHM_ICON_X, IHM_TEMP_Y, IHM_ICON_SIZE, IHM_ICON_SIZE,
+                          _temp_icon(cat));
+    } else if (st->temp != s_last_status.temp) {
+        _clear_row_text(IHM_TEMP_Y);
+    }
+    if (temp_icon_changed || st->temp != s_last_status.temp) {
         snprintf(line, sizeof(line), "Temp:    %u C", st->temp);
-        ILI9341_WriteString(8, IHM_STATUS_Y + 16, line, Font_11x18,
-                            ILI9341_WHITE, ILI9341_BLACK);
+        ILI9341_WriteString(IHM_TEXT_X, IHM_TEMP_Y + 8, line, Font_11x18,
+                            _temp_color(cat), ILI9341_BLACK);
     }
 
+    /* Umidade — ícone fixo, redesenhado só no full_redraw */
+    if (full_redraw) {
+        ILI9341_DrawImage(IHM_ICON_X, IHM_HUMIDITY_Y, IHM_ICON_SIZE, IHM_ICON_SIZE, umidade);
+    }
     if (full_redraw || st->humidity != s_last_status.humidity) {
-        if (!full_redraw) _clear_line(IHM_STATUS_Y + 38, Font_11x18.height);
+        if (!full_redraw) _clear_row_text(IHM_HUMIDITY_Y);
         snprintf(line, sizeof(line), "Umidade: %u %%", st->humidity);
-        ILI9341_WriteString(8, IHM_STATUS_Y + 38, line, Font_11x18,
+        ILI9341_WriteString(IHM_TEXT_X, IHM_HUMIDITY_Y + 8, line, Font_11x18,
                             ILI9341_WHITE, ILI9341_BLACK);
     }
 
+    /* Porta — ícone muda com o estado (aberta/fechada) */
     if (full_redraw || st->door != s_last_status.door) {
-        if (!full_redraw) _clear_line(IHM_STATUS_Y + 60, Font_11x18.height);
+        if (!full_redraw) _clear_row_full(IHM_DOOR_Y);
+        ILI9341_DrawImage(IHM_ICON_X, IHM_DOOR_Y, IHM_ICON_SIZE, IHM_ICON_SIZE,
+                          st->door ? porta_aberta : porta_fechada);
         snprintf(line, sizeof(line), "Porta:   %s", st->door ? "ABERTA" : "FECHADA");
-        ILI9341_WriteString(8, IHM_STATUS_Y + 60, line, Font_11x18,
+        ILI9341_WriteString(IHM_TEXT_X, IHM_DOOR_Y + 8, line, Font_11x18,
                             st->door ? ILI9341_RED : ILI9341_GREEN, ILI9341_BLACK);
     }
 
     s_last_status = *st;
+    s_last_temp_cat = cat;
     s_has_status  = 1;
     _bar_reset();
 }

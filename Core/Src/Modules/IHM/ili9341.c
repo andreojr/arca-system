@@ -296,7 +296,18 @@ void ILI9341_DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uin
 
     ILI9341_Select();
     ILI9341_SetAddressWindow(x, y, x+w-1, y+h-1);
-    ILI9341_WriteData((uint8_t*)data, sizeof(uint16_t)*w*h);
+
+    HAL_GPIO_WritePin(ILI9341_DC_GPIO_Port, ILI9341_DC_Pin, GPIO_PIN_SET);
+    for(uint32_t i = 0; i < (uint32_t)w*h; i++)
+    {
+        uint8_t pixel[2] = {
+            data[i] >> 8,
+            data[i] & 0xFF
+        };
+ 
+        HAL_SPI_Transmit(&ILI9341_SPI_PORT, pixel, 2, HAL_MAX_DELAY);
+    }
+    
     ILI9341_Unselect();
 }
 

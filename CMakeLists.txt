@@ -70,6 +70,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/Modules/IHM/ihm.c
     Core/Src/Modules/IHM/ili9341.c
     Core/Src/Modules/IHM/fonts.c
+    Core/Src/Modules/IHM/icons.c
 )
 
 # Add include paths
