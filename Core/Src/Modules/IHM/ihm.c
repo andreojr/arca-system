@@ -34,33 +34,6 @@
  * fechada); a umidade tem ícone fixo, redesenhado uma vez no full_redraw.
  */
 
-#define IHM_HEADER_H           40u
-#define IHM_BODY_Y             (IHM_HEADER_H + 8u)
-#define IHM_STATUS_Y           (IHM_BODY_Y + 60u)
-
-#define IHM_ICON_X             8u
-#define IHM_TEXT_X             48u
-#define IHM_ICON_SIZE          32u
-
-/* Linha de "Sala n (INT/EXT)" fica sem ícone; as 3 linhas de status
- * (temp/umidade/porta) precisam de espaço pro ícone de 32px. */
-#define IHM_TEMP_Y             (IHM_STATUS_Y + 18u)
-#define IHM_HUMIDITY_Y         (IHM_TEMP_Y + 35u)
-#define IHM_DOOR_Y             (IHM_HUMIDITY_Y + 35u)
-
-#define IHM_TEMP_LIMIAR_FRIO    24u
-#define IHM_TEMP_LIMIAR_QUENTE  28u
-
-/* Tempo que um evento permanece na tela antes de voltar ao repouso. */
-#define IHM_EVENT_TIMEOUT_MS   5000u
-
-/* Barra de progresso (linha inferior): cresce da esquerda pra direita ao
- * longo de STATUS_UPDATE_INTERVAL_MS, zerando a cada novo status recebido. */
-#define IHM_BAR_MARGIN         8u
-#define IHM_BAR_H              6u
-#define IHM_BAR_Y              (ILI9341_HEIGHT - 12u)
-#define IHM_BAR_W              (ILI9341_WIDTH - 2u * IHM_BAR_MARGIN)
-
 /* Ícones */
 extern const uint16_t temp_quente[];
 extern const uint16_t temp_padrao[];
