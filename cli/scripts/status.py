@@ -1,6 +1,7 @@
 import datetime
 
 from scripts.protocol import list_usb_ports, probe_port, send_frame
+from scripts.sync_rtc import _CMD_SET_TIME
 from scripts.ui import choose, describe_node, labeled_row, mark, plain_row, print_box
 
 _CMD_IDENTIFY = ord("I")
@@ -61,6 +62,23 @@ def _render_door(node_label: str, pn532_ok: bool, cc1101_ok: bool, data: bytes) 
     return pn532_ok and cc1101_ok and dht_ok and press_ok
 
 
+def _sync_payload() -> bytes:
+    now = datetime.datetime.now()
+    return bytes([
+        _CMD_SET_TIME,
+        now.hour, now.minute, now.second,
+        now.day, now.month, now.year - 2000,
+        now.isoweekday(),
+    ])
+
+
+def _controller_needs_sync(data: bytes) -> bool:
+    if len(data) < 13 or data[4] != _ADDR_CONTROLLER:
+        return False
+    hours, minutes, seconds, day, month, year_2d, weekday, is_valid = data[5:13]
+    return not (bool(is_valid) and _is_synced(2000 + year_2d, month, day, hours, minutes, seconds))
+
+
 def _render(data: bytes) -> bool:
     if len(data) < 5:
         print(f"{mark(False)} Resposta incompleta do dispositivo")
@@ -94,6 +112,9 @@ def check_status() -> bool:
         if data is None:
             print(f"{mark(False)} Sem resposta válida do dispositivo")
             return False
+        if _controller_needs_sync(data):
+            send_frame(_sync_payload())
+            data = send_frame(bytes([_CMD_STATUS])) or data
         return _render(data)
 
     # varias portas conectadas -> so identifica quem e quem (comando leve,
@@ -124,6 +145,9 @@ def check_status() -> bool:
     if data is None:
         print(f"{mark(False)} Sem resposta válida do dispositivo")
         return False
+    if _controller_needs_sync(data):
+        probe_port(port, _sync_payload())
+        data = probe_port(port, bytes([_CMD_STATUS])) or data
     return _render(data)
 
 

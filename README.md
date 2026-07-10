@@ -45,47 +45,67 @@ O firmware é **único** para todos os módulos. O tipo de nó é selecionado em
 
 ```
 arca/
-└── Core/
-    ├── Inc/
-    │   ├── app.h                            # Entry points da aplicação
-    │   └── Modules/
-    │       ├── config.h                     # Endereços de rede, eventos e seleção de módulo
-    │       ├── dispatcher.h                 # Roteamento de eventos RF
-    │       ├── hub.h                        # Máquina de estados do controlador
-    │       ├── door.h                       # Máquina de estados da porta
-    │       ├── flash_db.h                   # Banco de dados em flash
-    │       ├── dht11.h                      # Driver DHT11
-    │       ├── press.h                      # Sensor de força (ADC)
-    │       ├── Communication/
-    │       │   ├── cc1101.h                 # Driver CC1101 (registradores, SPI)
-    │       │   └── com_module.h             # Protocolo de pacotes RF
-    │       ├── Nfc/
-    │       │   ├── pn532.h                  # Driver PN532 (MIFARE, NTAG2xx)
-    │       │   └── pn532_stm32f4.h          # HAL layer STM32 (SPI, IRQ, bit-reversal)
-    │       └── IHM/
-    │           ├── ihm.h                    # Interface do display (IHM_Status_t, funções públicas)
-    │           ├── ili9341.h                # Driver ILI9341 (pinos, cores, API)
-    │           └── fonts.h                  # Definição de fontes bitmap
-    └── Src/
-        ├── app.c                            # Inicialização e loop principal da aplicação
-        ├── main.c                           # Inicialização HAL, periféricos e ISRs
-        └── Modules/
-            ├── dispatcher.c                 # Roteamento de eventos RF
-            ├── hub.c                        # Validação de acesso e cadastro
-            ├── door.c                       # Lógica de autorização e abertura
-            ├── flash_db.c                   # Leitura/escrita na flash interna
-            ├── dht11.c                      # Driver DHT11 (OneWire)
-            ├── press.c                      # Leitura do sensor de força via ADC
-            ├── Communication/
-            │   ├── cc1101.c                 # Driver CC1101
-            │   └── com_module.c             # Protocolo RF (TX/RX, callbacks)
-            ├── Nfc/
-            │   ├── pn532.c                  # Driver PN532
-            │   └── pn532_stm32f4.c          # Adaptador STM32 para PN532
-            └── IHM/
-                ├── ihm.c                    # Interface do display (telas idle/evento/status)
-                ├── ili9341.c                # Driver SPI do ILI9341 (240×320)
-                └── fonts.c                  # Fontes bitmap (7×10, 11×18)
+├── Core/
+│   ├── Inc/
+│   │   ├── app.h                            # Entry points da aplicação
+│   │   └── Modules/
+│   │       ├── config.h                     # Endereços de rede, eventos e seleção de módulo
+│   │       ├── dispatcher.h                 # Roteamento de eventos RF
+│   │       ├── hub.h                        # Máquina de estados do controlador
+│   │       ├── door.h                       # Máquina de estados da porta
+│   │       ├── flash_db.h                   # Banco de dados em flash
+│   │       ├── dht11.h                      # Driver DHT11
+│   │       ├── press.h                      # Sensor de força (ADC)
+│   │       ├── uart_protocol.h              # Framing de pacotes sobre UART1 (start/stop, IRQ)
+│   │       ├── Communication/
+│   │       │   ├── cc1101.h                 # Driver CC1101 (registradores, SPI)
+│   │       │   └── com_module.h             # Protocolo de pacotes RF
+│   │       ├── Nfc/
+│   │       │   ├── pn532.h                  # Driver PN532 (MIFARE, NTAG2xx)
+│   │       │   └── pn532_stm32f4.h          # HAL layer STM32 (SPI, IRQ, bit-reversal)
+│   │       ├── RTC/
+│   │       │   ├── rtc_api.h                # Comandos GET/SET de hora via UART (CLI)
+│   │       │   └── rtc_sync.h               # Leitura/escrita do RTC + validação via backup register
+│   │       └── IHM/
+│   │           ├── ihm.h                    # Interface do display (IHM_Status_t, funções públicas)
+│   │           ├── ili9341.h                # Driver ILI9341 (pinos, cores, API)
+│   │           ├── fonts.h                  # Definição de fontes bitmap
+│   │           └── icons.h                  # Ícones (temperatura, umidade, porta) em bitmap
+│   └── Src/
+│       ├── app.c                            # Inicialização e loop principal da aplicação
+│       ├── main.c                           # Inicialização HAL, periféricos e ISRs
+│       └── Modules/
+│           ├── dispatcher.c                 # Roteamento de eventos RF
+│           ├── hub.c                        # Validação de acesso e cadastro
+│           ├── door.c                       # Lógica de autorização e abertura
+│           ├── flash_db.c                   # Leitura/escrita na flash interna
+│           ├── dht11.c                      # Driver DHT11 (OneWire)
+│           ├── press.c                      # Leitura do sensor de força via ADC
+│           ├── uart_protocol.c               # Framing de pacotes sobre UART1 (start/stop, IRQ)
+│           ├── Communication/
+│           │   ├── cc1101.c                 # Driver CC1101
+│           │   └── com_module.c             # Protocolo RF (TX/RX, callbacks)
+│           ├── Nfc/
+│           │   ├── pn532.c                  # Driver PN532
+│           │   └── pn532_stm32f4.c          # Adaptador STM32 para PN532
+│           ├── RTC/
+│           │   ├── rtc_api.c                # Comandos GET/SET de hora via UART (CLI)
+│           │   └── rtc_sync.c               # Leitura/escrita do RTC + validação via backup register
+│           └── IHM/
+│               ├── ihm.c                    # Interface do display (telas idle/evento/status)
+│               ├── ili9341.c                # Driver SPI do ILI9341 (240×320)
+│               ├── fonts.c                  # Fontes bitmap (7×10, 11×18)
+│               └── icons.c                  # Ícones (temperatura, umidade, porta) em bitmap
+└── cli/
+    ├── Makefile                             # Alvos: status (padrão), sync, enroll, delete
+    ├── config.py                            # Configuração de porta/baudrate serial
+    └── scripts/
+        ├── protocol.py                      # Framing/serial compartilhado pelos comandos
+        ├── ui.py                            # Renderização de menus e caixas no terminal
+        ├── status.py                        # Detecção de dispositivo, identificação de nó e status
+        ├── sync_rtc.py                      # Sincronização do RTC com o horário do PC
+        ├── enroll.py                        # Cadastro de cartão NFC
+        └── delete.py                        # Remoção de cartão cadastrado
 ```
 
 ---
@@ -134,7 +154,7 @@ Transmissor                          Controlador
     │  [sensor de força detecta abertura] │
     │                                     │
     │── EVENT_ACCESS_CONFIRMED ─────────►│
-    │                                     │  registra log na flash
+    │                                     │  exibe no display e imprime na UART
 ```
 
 ---
@@ -177,7 +197,7 @@ Utiliza dois setores da flash interna do STM32F411:
 | Setor | Endereço | Conteúdo | Capacidade |
 |---|---|---|---|
 | Setor 6 | `0x08040000` | Tabela de usuários | 4096 registros |
-| Setor 7 | `0x08060000` | Log de acessos | 4096 registros |
+| Setor 7 | `0x08060000` | Log de acessos *(reservado, ainda não gravado — ver [Próximos Passos](#próximos-passos))* | 4096 registros |
 
 ### Registro de Usuário (`FlashUser_t` — 32 bytes)
 
@@ -185,14 +205,14 @@ Utiliza dois setores da flash interna do STM32F411:
 uint8_t uid[7];       // UID do cartão NFC
 uint8_t uid_len;      // Comprimento do UID
 char    name[21];     // Nome do titular
-uint8_t access_lvl;  // Nível de acesso (reservado)
+uint8_t access_lvl;  // Nível de acesso (reservado, ainda não usado na validação)
 uint8_t valid;        // 0xFF=vazio, 0x01=ativo, 0x00=removido (soft-delete)
 ```
 
-### Registro de Log (`FlashLog_t` — 32 bytes)
+### Registro de Log (`FlashLog_t` — 32 bytes, definido mas ainda não persistido)
 
 ```c
-uint32_t timestamp;   // Timestamp do evento (RTC — integração pendente)
+uint32_t timestamp;   // Timestamp do evento (RTC)
 uint8_t  uid[7];      // UID do cartão
 uint8_t  uid_len;
 uint8_t  room_id;     // Sala onde ocorreu o evento
@@ -208,7 +228,8 @@ uint8_t  direction;   // 1 = entrada, 2 = saída
 | SPI1 | PA5/PA6/PA7 | CC1101 + PN532 + ILI9341 (NSS por software) |
 | UART1 | PA9/PA10 | Debug (printf) + comandos do controlador |
 | ADC1 CH4 | PA4 | Sensor de força (limiar 2000, debounce 50 ms) |
-| RTC | — | Timestamp de log (LSE 32.768 kHz, inicializado) |
+| RTC | — | Timestamp de log (LSE 32.768 kHz) + sincronização via UART/CLI |
+| TIM10 | — | Disparo periódico de `EVENT_STATUS_REQUEST` (independente do loop principal) |
 | GPIO PB13 | LED_GRANTED | LED verde (acesso liberado) |
 | GPIO PB12 | LED_DENIED | LED vermelho (acesso negado) |
 | GPIO PB3 | BUZZER | Buzzer (acesso negado / porta aberta) |
@@ -221,6 +242,21 @@ uint8_t  direction;   // 1 = entrada, 2 = saída
 | GPIO PB1 | IHM_LED | Retroiluminação do display |
 
 Clock do sistema: **84 MHz** (HSI × PLL).
+
+---
+
+## CLI (`cli/`)
+
+Ferramenta de apoio em Python para operar o Controlador via UART/USB, com menu interativo (`make status`, `make enroll`, `make delete`, `make sync-rtc`):
+
+| Script | Função |
+|---|---|
+| `enroll.py` | Cadastra um novo cartão NFC (aguarda leitura no controlador) |
+| `delete.py` | Remove um cartão cadastrado |
+| `status.py` | Detecta o dispositivo na porta USB, identifica o nó (controlador/porta) e exibe status (PN532, CC1101, RTC, sincronismo) |
+| `sync_rtc.py` | Sincroniza o RTC do controlador com o horário do PC |
+| `protocol.py` | Camada de framing/serial compartilhada pelos comandos |
+| `ui.py` | Renderização de menus e caixas no terminal |
 
 ---
 
@@ -239,19 +275,20 @@ Clock do sistema: **84 MHz** (HSI × PLL).
 - [x] Máquina de estados do módulo de porta (5 estados, 4 timeouts)
 - [x] Máquina de estados do controlador (cadastro/remoção via UART)
 - [x] Banco de dados de usuários na flash interna (soft-delete, 4096 slots)
-- [x] Log de acessos na flash interna (4096 entradas)
 - [x] `EVENT_ACCESS_CONFIRMED` — transmissor informa controlador que a porta foi efetivamente aberta
 - [x] Alternância de endereço entrada↔saída após abertura de porta
 - [x] Dispatcher de eventos RF (controller e transmitter)
 - [x] Debug via UART1 (printf redirecionado)
 - [x] Display MSP2402 (ILI9341, 240×320) — driver SPI completo, tela de repouso, evento de acesso (sala/direção/UID) e bloco de status ambiental (temp/umidade/porta); retorno automático ao repouso após 5 s
+- [x] RTC integrado (LSE 32.768 kHz), com sincronização via UART/CLI e timestamp real exibido no display/log serial
+- [x] Status ambiental periódico via TIM10, independente do loop principal
+- [x] CLI em Python (status, enroll, delete, sync-rtc) via Makefile
 
-### Pendente / Em desenvolvimento
+### Próximos Passos
 
-- [ ] **RTC no log de acesso** — periférico inicializado, mas o timestamp real ainda não é lido e preenchido em `FlashDB_LogAdd`
-- [ ] **Validação por nível de acesso** — campo `access_lvl` existe na estrutura, lógica de comparação com o nível da sala não implementada
-- [ ] **Status periódico** — `HUB_RequestStatus` é chamado uma vez na inicialização; polling contínuo por `HAL_GetTick` não implementado
-- [ ] **Exportação de logs via UART** — escrita na flash implementada; leitura e envio dos registros para PC via serial não implementada
+- [ ] **Persistência do log de acessos na flash** — `FlashDB_LogAdd`/`FlashDB_LogRead` estão declarados em `flash_db.h` mas não implementados em `flash_db.c`; hoje o evento de acesso confirmado (`HUB_OnAccessConfirmed`) só é impresso via UART e exibido no display, sem gravação no Setor 7
+- [ ] **Validação por nível de acesso** — campo `access_lvl` existe em `FlashUser_t`, mas todo cadastro é feito com valor fixo (`1`) e não há lógica de comparação com o nível exigido pela sala
+- [ ] **Exportação de logs via UART/CLI** — sem persistência do log em flash, ainda não há como ler e exportar o histórico de acessos para o PC
 
 ---
 
