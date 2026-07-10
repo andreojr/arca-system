@@ -83,6 +83,7 @@ static uint8_t      s_has_status     = 0;   /* já recebemos algum STATUS_UPDATE
 static IHM_Status_t s_last_status;          /* último status desenhado, p/ diff */
 static uint32_t     s_bar_start_tick = 0;   /* tick do último STATUS_UPDATE     */
 static uint16_t     s_bar_filled_px  = 0;   /* largura já pintada da barra      */
+static IHM_TempCat_t s_last_temp_cat = IHM_TEMP_CAT_NORMAL; /* p/ diff */
 
 /* Marca que um evento acabou de ser desenhado (rearma o timer). */
 static void _mark_event(void)
